@@ -1,5 +1,5 @@
 PORTNAME=	openssl
-DISTVERSION=	3.2.0-alpha2
+DISTVERSION=	3.2.0
 CATEGORIES=	security devel
 MASTER_SITES=	https://www.openssl.org/source/ \
 		ftp://ftp.cert.dfn.de/pub/tools/net/openssl/source/
@@ -12,7 +12,7 @@ WWW=		https://www.openssl.org/
 LICENSE=	APACHE20
 LICENSE_FILE=	${WRKSRC}/LICENSE.txt
 
-CONFLICTS_INSTALL=	boringssl libressl libressl-devel openssl openssl3[01] openssl-quictls
+CONFLICTS_INSTALL=	boringssl libressl libressl-devel openssl openssl111 openssl31 openssl-quictls
 
 HAS_CONFIGURE=	yes
 CONFIGURE_SCRIPT=	config
@@ -144,6 +144,8 @@ ZSTD_CONFIGURE_ON=	enable-zstd-dynamic
 ZSTD_LIB_DEPENDS=	libzstd.so:archivers/zstd
 
 SHLIBS=			lib/engines-${OPENSSL_SHLIBVER}/loader_attic.so
+
+PORTSCOUT=		limit=^3\.2\.
 
 .include <bsd.port.options.mk>
 

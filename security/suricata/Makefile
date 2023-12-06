@@ -1,5 +1,6 @@
 PORTNAME=	suricata
-DISTVERSION=	7.0.1
+DISTVERSION=	7.0.2
+PORTREVISION=   4
 CATEGORIES=	security
 MASTER_SITES=	https://www.openinfosecfoundation.org/download/
 
@@ -15,6 +16,7 @@ LIB_DEPENDS=	libjansson.so:devel/jansson \
 		liblz4.so:archivers/liblz4 \
 		libnet.so:net/libnet \
 		libpcre2-8.so:devel/pcre2 \
+		libpfctl.so.0:net/libpfctl \
 		libyaml.so:textproc/libyaml
 
 USES=		autoreconf cpe gmake iconv:translit libtool localbase pathfix \
@@ -31,6 +33,7 @@ CONFIGURE_ARGS+=	--disable-gccmarch-native \
 			--enable-bundled-htp \
 			--enable-gccprotect
 MAKE_ENV=		RUSTFLAGS="${RUSTFLAGS} -C linker=${CC:Q} ${LDFLAGS:C/.+/-C link-arg=&/}"
+LDFLAGS+=	${LOCALBASE}/lib/libpfctl.so.0
 
 INSTALL_TARGET=	install-strip
 TEST_TARGET=	check

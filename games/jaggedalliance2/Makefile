@@ -1,7 +1,7 @@
 PORTNAME=	ja2
 DISTVERSIONPREFIX=	v
 DISTVERSION=	0.20.0
-PORTREVISION=	5
+PORTREVISION=	7
 CATEGORIES=	games
 
 MAINTAINER=	timp87@gmail.com
@@ -25,7 +25,7 @@ BUILD_DEPENDS=	string_theory>=3.1:devel/string_theory \
 		miniaudio>=0.11.9:audio/miniaudio
 LIB_DEPENDS=	libfltk.so:x11-toolkits/fltk
 
-USES=		cargo cmake compiler:c++17-lang pkgconfig sdl xorg gl lua:53
+USES=		cargo cmake compiler:c++17-lang pkgconfig sdl xorg gl lua:53+
 USE_GITHUB=	yes
 GH_ACCOUNT=	ja2-stracciatella
 GH_PROJECT=	ja2-stracciatella
@@ -159,6 +159,12 @@ CARGO_TEST=		no
 MAKE_ENV=	${CARGO_ENV:NCARGO_TARGET_DIR=*}
 LDFLAGS+=	-Wl,--as-needed
 
+.include <bsd.port.pre.mk>
+
+.if ${OSVERSION} >= 1400000
+CXXFLAGS+=	-Wno-error=enum-constexpr-conversion
+.endif
+
 pre-patch:
 	@${REINPLACE_CMD} -e 's|https://github.com/Neargye/magic_enum/archive/v0.7.3.zip|${DISTDIR}/Neargye-magic_enum-v0.7.3_GH0.tar.gz|' \
 		-e 's|86338841251da1bacab82684a76c4042|fc20f4149a6d6a2caa8ff66f99dac7cf|' \
@@ -173,20 +179,5 @@ post-install:
 	${STRIP_CMD} ${STAGEDIR}${PREFIX}/bin/ja2 \
 		${STAGEDIR}${PREFIX}/bin/ja2-launcher \
 		${STAGEDIR}${PREFIX}/bin/ja2-resource-pack
-
-.include <bsd.port.pre.mk>
-
-# Compilation with clang's broken in 14-CURRENT
-.if ${OSVERSION} >= 1400000
-# See https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=236344
-# Copy-pasted gcc-c++11-lib from Mk/Uses/compiler.mk
-USE_GCC=	yes
-CHOSEN_COMPILER_TYPE=	gcc
-CXXFLAGS+=	-nostdinc++ -isystem /usr/include/c++/v1
-LDFLAGS+=	-L${WRKDIR}
-_USES_configure+=	200:gcc-libc++-configure
-gcc-libc++-configure:
-	@${LN} -fs /usr/lib/libc++.so ${WRKDIR}/libstdc++.so
-.endif
 
 .include <bsd.port.post.mk>

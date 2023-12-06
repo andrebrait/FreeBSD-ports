@@ -88,6 +88,7 @@
     SUBDIR += backuppc-devel
     SUBDIR += backuppc4
     SUBDIR += backupuser
+    SUBDIR += bacnet-stack-apps
     SUBDIR += bacula-libs3
     SUBDIR += bacula11-client
     SUBDIR += bacula11-client-static
@@ -183,8 +184,10 @@
     SUBDIR += cdrtools
     SUBDIR += cfengine
     SUBDIR += cfengine-devel
+    SUBDIR += cfengine-lts
     SUBDIR += cfengine-masterfiles
     SUBDIR += cfengine-masterfiles-devel
+    SUBDIR += cfengine-masterfiles-lts
     SUBDIR += cfengine-masterfiles320
     SUBDIR += cfengine-masterfiles321
     SUBDIR += cfengine-masterfiles322
@@ -221,6 +224,7 @@
     SUBDIR += conky-awesome
     SUBDIR += conman
     SUBDIR += conmon
+    SUBDIR += conserve
     SUBDIR += consolehm
     SUBDIR += consolekit2
     SUBDIR += consul
@@ -372,6 +376,7 @@
     SUBDIR += exa
     SUBDIR += exfat-utils
     SUBDIR += extipl
+    SUBDIR += eza
     SUBDIR += ezjail
     SUBDIR += f2
     SUBDIR += f3
@@ -382,6 +387,7 @@
     SUBDIR += fanout
     SUBDIR += fastfetch
     SUBDIR += fatback
+    SUBDIR += fclones
     SUBDIR += fcode-utils
     SUBDIR += fconfig
     SUBDIR += fcron
@@ -405,6 +411,7 @@
     SUBDIR += flasher
     SUBDIR += flashrom
     SUBDIR += flexbackup
+    SUBDIR += flipperbit
     SUBDIR += flock
     SUBDIR += flog
     SUBDIR += flowgger
@@ -414,10 +421,6 @@
     SUBDIR += foremost
     SUBDIR += fortunelock
     SUBDIR += fpart
-    SUBDIR += fpc-syslog
-    SUBDIR += fpc-users
-    SUBDIR += fpc-utmp
-    SUBDIR += fpc-uuid
     SUBDIR += frand
     SUBDIR += freebsd-snapshot
     SUBDIR += freecolor
@@ -854,7 +857,7 @@
     SUBDIR += openipmi
     SUBDIR += opensbi
     SUBDIR += openseachest
-    SUBDIR += openshift-install
+    SUBDIR += opentofu
     SUBDIR += openupsd
     SUBDIR += openzfs
     SUBDIR += openzfs-kmod
@@ -868,6 +871,7 @@
     SUBDIR += p5-BSD-getloadavg
     SUBDIR += p5-BackupPC-XS
     SUBDIR += p5-Brackup
+    SUBDIR += p5-Command-Runner
     SUBDIR += p5-Device-RAID-Poller
     SUBDIR += p5-Dir-Purge
     SUBDIR += p5-File-BackupCopy
@@ -1042,6 +1046,7 @@
     SUBDIR += procenv
     SUBDIR += process-viewer
     SUBDIR += procmap
+    SUBDIR += procs
     SUBDIR += progsreiserfs
     SUBDIR += pslist
     SUBDIR += psmisc
@@ -1406,6 +1411,7 @@
     SUBDIR += sysvbanner
     SUBDIR += szyszka
     SUBDIR += tai64nfrac
+    SUBDIR += tailspin
     SUBDIR += tarsnap
     SUBDIR += tarsnap-gui
     SUBDIR += tarsnap-periodic
@@ -1469,6 +1475,7 @@
     SUBDIR += u-boot-bananapi
     SUBDIR += u-boot-bananapim2
     SUBDIR += u-boot-beaglebone
+    SUBDIR += u-boot-bhyve-arm64
     SUBDIR += u-boot-chip
     SUBDIR += u-boot-clearfog
     SUBDIR += u-boot-cubieboard
@@ -1636,6 +1643,7 @@
     SUBDIR += xin
     SUBDIR += xjobs
     SUBDIR += xmbmon
+    SUBDIR += xnvme
     SUBDIR += xorriso
     SUBDIR += xosview
     SUBDIR += xpipe

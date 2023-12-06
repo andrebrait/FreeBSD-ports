@@ -1,5 +1,6 @@
 PORTNAME=	pfSense
 DISTVERSION=	${PRODUCT_VERSION}
+DISTVERSIONPREFIX=	v
 CATEGORIES=	security
 
 MAINTAINER=	coreteam@pfsense.org
@@ -50,6 +51,7 @@ RUN_DEPENDS=	bind-tools>=0:dns/bind-tools \
 		${PHP_PKGNAMEPREFIX}phpseclib>=0:security/phpseclib@${PHP_FLAVOR} \
 		pfSense-Status_Monitoring${PHP_PKGNAMESUFFIX}>=0:sysutils/pfSense-Status_Monitoring@${PHP_FLAVOR} \
 		pfSense-composer-deps>=0:devel/pfSense-composer-deps \
+		pfSense-gnid>=0:security/pfSense-gnid \
 		pfSense-repo>=0:sysutils/pfSense-repo \
 		pfSense-upgrade>=0:sysutils/pfSense-upgrade \
 		pftop>=0:sysutils/pftop \
@@ -79,7 +81,7 @@ LIB_DEPENDS=	libltdl.so:devel/libltdl
 
 USES=		kmod php:flavors
 
-IGNORE_WITH_PHP=	72 73 74 80 81
+IGNORE_WITH_PHP=	72 73 74 80 81 82
 USE_PHP=	bz2 bcmath ctype curl dom filter gettext gmp intl json mbstring \
 		mcrypt opcache openssl pcntl pdo pdo_sqlite posix \
 		radius readline session shmop simplexml sockets sysvmsg sysvsem \

@@ -1,5 +1,5 @@
-diff -ruN ./suricata-7.0.0.orig/src/Makefile.am ./suricata-7.0.0/src/Makefile.am
---- ./suricata-7.0.0.orig/src/Makefile.am	2023-07-18 00:38:14.000000000 -0400
+diff -ruN ./suricata-7.0.2.orig/src/Makefile.am ./suricata-7.0.2/src/Makefile.am
+--- ./suricata-7.0.2.orig/src/Makefile.am	2023-10-18 10:25:29.000000000 -0400
 +++ ./src/Makefile.am	2023-08-03 09:21:02.000000000 -0400
 @@ -13,6 +13,7 @@
  	action-globals.h \
@@ -17,9 +17,9 @@ diff -ruN ./suricata-7.0.0.orig/src/Makefile.am ./suricata-7.0.0/src/Makefile.am
  	alert-syslog.c \
  	app-layer.c \
  	app-layer-detect-proto.c \
-diff -ruN ./suricata-7.0.0.orig/src/Makefile.in ./suricata-7.0.0/src/Makefile.in
---- ./suricata-7.0.0.orig/src/Makefile.in	2023-07-18 00:43:27.000000000 -0400
-+++ ./src/Makefile.in	2023-08-03 09:29:04.000000000 -0400
+diff -ruN ./suricata-7.0.2.orig/src/Makefile.in ./suricata-7.0.2/src/Makefile.in
+--- ./suricata-7.0.2.orig/src/Makefile.in	2023-10-18 10:30:29.000000000 -0400
++++ ./src/Makefile.in	2023-11-09 14:54:23.000000000 -0500
 @@ -153,6 +153,7 @@
  libsuricata_c_a_LIBADD =
  am_libsuricata_c_a_OBJECTS = alert-debuglog.$(OBJEXT) \
@@ -76,10 +76,10 @@ diff -ruN ./suricata-7.0.0.orig/src/Makefile.in ./suricata-7.0.0/src/Makefile.in
  	-rm -f ./$(DEPDIR)/alert-syslog.Po
  	-rm -f ./$(DEPDIR)/app-layer-detect-proto.Po
  	-rm -f ./$(DEPDIR)/app-layer-dnp3-objects.Po
-diff -ruN ./suricata-7.0.0.orig/src/alert-pf.c ./suricata-7.0.0/src/alert-pf.c
---- ./suricata-7.0.0.orig/src/alert-pf.c	1969-12-31 19:00:00.000000000 -0500
-+++ ./src/alert-pf.c	2023-08-09 14:13:26.000000000 -0400
-@@ -0,0 +1,1889 @@
+diff -ruN ./suricata-7.0.2.orig/src/alert-pf.c ./suricata-7.0.2/src/alert-pf.c
+--- ./suricata-7.0.2.orig/src/alert-pf.c	1969-12-31 19:00:00.000000000 -0500
++++ ./src/alert-pf.c	2023-11-17 11:36:52.000000000 -0500
+@@ -0,0 +1,1882 @@
 +/* Copyright (C) 2007-2023 Open Information Security Foundation
 + *
 + * You can copy, redistribute or modify this Program under the terms of
@@ -191,6 +191,9 @@ diff -ruN ./suricata-7.0.0.orig/src/alert-pf.c ./suricata-7.0.0/src/alert-pf.c
 +#include <regex.h>
 +#include <ifaddrs.h>
 +#include <pthread.h>
++#ifdef __FreeBSD__
++#include <libpfctl.h>
++#endif
 +
 +#define PFDEVICE	"/dev/pf"
 +#define WLMAX		4096
@@ -349,6 +352,7 @@ diff -ruN ./suricata-7.0.0.orig/src/alert-pf.c ./suricata-7.0.0/src/alert-pf.c
 +	
 +    /* query pf for all registered table names again */
 +    if(ioctl(dev, DIOCRGETTABLES, &io)) {
++        free(table_aux);
 +        SCLogError("AlertPfTableExists(): ioctl() DIOCRGETTABLES: %s\n", strerror(errno));
 +        return -1;
 +    }
@@ -358,11 +362,14 @@ diff -ruN ./suricata-7.0.0.orig/src/alert-pf.c ./suricata-7.0.0/src/alert-pf.c
 +     * return 1 (true) if we find it.
 +     */
 +    for(i=0; i < io.pfrio_size; i++) {
-+        if (!strcmp(table_aux[i].pfrt_name, tablename))
-+            return 1;	
++        if (!strcmp(table_aux[i].pfrt_name, tablename)) {
++            free(table_aux);
++            return 1;
++        }	
 +    }
 +
 +    /* did not find the referenced table */	
++    free(table_aux);
 +    return 0;
 +}
 +
@@ -373,10 +380,10 @@ diff -ruN ./suricata-7.0.0.orig/src/alert-pf.c ./suricata-7.0.0/src/alert-pf.c
 + */
 +static int AlertPfBlock(ThreadVars *tv, AlertPfThread *data, const Address *net_addr) 
 +{ 
-+    struct pfioc_table io;
 +    struct pfr_table table;
 +    struct pfr_addr addr;
 +    int states_err = 0;
++    int nadd = 0;
 +    char timebuf[64];
 +    char blockip[INET6_ADDRSTRLEN];
 +    struct timeval tval;
@@ -389,10 +396,8 @@ diff -ruN ./suricata-7.0.0.orig/src/alert-pf.c ./suricata-7.0.0/src/alert-pf.c
 +        return -1;
 +    }
 +
-+    memset(&io,    0x00, sizeof(struct pfioc_table)); 
 +    memset(&table, 0x00, sizeof(struct pfr_table)); 
 +    memset(&addr,  0x00, sizeof(struct pfr_addr)); 
-+
 +    strlcpy(table.pfrt_name, data->ctx->pftable, PF_TABLE_NAME_SIZE); 
 +        
 +    if (net_addr->family == AF_INET)
@@ -407,16 +412,6 @@ diff -ruN ./suricata-7.0.0.orig/src/alert-pf.c ./suricata-7.0.0/src/alert-pf.c
 +    addr.pfra_af  = net_addr->family; 
 +    addr.pfra_net = net_addr->family == AF_INET ? 32 : 128;
 +
-+    io.pfrio_table  = table; 
-+    io.pfrio_buffer = &addr; 
-+    io.pfrio_esize  = sizeof(addr); 
-+    io.pfrio_size   = 1; 
-+
-+    /* check if IP already in pf table and place
-+     * result in 'addr.pfra_fback' for use later.
-+     */
-+    ioctl(data->fd, DIOCRTSTADDRS, &io);
-+        
 +    /* Prepare some needed variables if pass list debugging enabled */
 +    if (data->ctx->passlist_dbg) {
 +        /* create a time string from packet's timestamp for debug log */
@@ -426,19 +421,8 @@ diff -ruN ./suricata-7.0.0.orig/src/alert-pf.c ./suricata-7.0.0/src/alert-pf.c
 +        PrintInet(net_addr->family, (const void *)net_addr->addr_data8, blockip, sizeof(blockip));
 +    }
 +
-+    /* skip addition if IP already in pf table */
-+    if (addr.pfra_fback == PFR_FB_MATCH) {
-+        if (data->ctx->passlist_dbg) {
-+            SCMutexLock(&data->ctx->dbgfile_ctx->fp_mutex);
-+            fprintf(data->ctx->dbgfile_ctx->fp, "%s  Thread: %s  Skipping insertion of IP: %s because it was previously inserted into pf table %s.\n", timebuf, tv->name, blockip, table.pfrt_name);
-+            fflush(data->ctx->dbgfile_ctx->fp);
-+            SCMutexUnlock(&data->ctx->dbgfile_ctx->fp_mutex);
-+        }
-+        return 0;
-+    }
-+
-+    /* add the passed address to the pf table */
-+    if (ioctl(data->fd, DIOCRADDADDRS, &io)) {
++    /* Add offender's IP address to passed pf table */
++    if (pfctl_table_add_addrs(data->fd, &table, &addr, 1, &nadd, 0)) {
 +        SCLogError("AlertPfBlock(): ioctl() DIOCRADDADDRS: %s\n", strerror(errno));
 +        if (data->ctx->passlist_dbg) {
 +            SCMutexLock(&data->ctx->dbgfile_ctx->fp_mutex);
@@ -452,7 +436,7 @@ diff -ruN ./suricata-7.0.0.orig/src/alert-pf.c ./suricata-7.0.0/src/alert-pf.c
 +    /* count an IP block if we successfully added IP address
 +     * to the pf table.
 +     */
-+    if (io.pfrio_nadd > 0) {
++    if (nadd > 0) {
 +        SC_ATOMIC_ADD(alert_pf_blocks, 1);
 +        if (data->ctx->passlist_dbg) {
 +            SCMutexLock(&data->ctx->dbgfile_ctx->fp_mutex);
@@ -466,34 +450,37 @@ diff -ruN ./suricata-7.0.0.orig/src/alert-pf.c ./suricata-7.0.0/src/alert-pf.c
 +     * if 'kill-state' option enabled from YAML conf file.
 +     */
 +    if (data->ctx->kill_state) {
-+        struct pfioc_state_kill psk;
++        struct pfctl_kill kill = {
++            .af = net_addr->family,
++        };
++        unsigned int nkill = 0;
 +
-+        memset(&psk, 0, sizeof(psk));
-+        memset(&psk.psk_src.addr.v.a.mask, 0xff, sizeof(psk.psk_src.addr.v.a.mask));
-+        psk.psk_af = net_addr->family;
-+        if (psk.psk_af == AF_INET)
-+            psk.psk_src.addr.v.a.addr.v4.s_addr = net_addr->addr_data32[0];
-+        else if (psk.psk_af == AF_INET6)
-+            memcpy(&psk.psk_src.addr.v.a.addr.v6, net_addr->addr_data8, sizeof(psk.psk_src.addr.v.a.addr.v6));
++        memset(&kill.src.addr.v.a.mask, 0xff, sizeof(kill.src.addr.v.a.mask));
++        if (kill.af == AF_INET)
++            kill.src.addr.v.a.addr.v4.s_addr = net_addr->addr_data32[0];
++        else if (kill.af == AF_INET6)
++            memcpy(&kill.src.addr.v.a.addr.v6, net_addr->addr_data8, sizeof(kill.src.addr.v.a.addr.v6));
++        else
++            return (-1);
 +
-+        /* clear any open states where this IP is SRC */
-+        if (ioctl(data->fd, DIOCKILLSTATES, &psk)) {
-+            SCLogError("AlertPfBlock(): ioctl() DIOCKILLSTATES: %s\n", strerror(errno));
-+            states_err = 1;
++        /* Kill any open firewall states where blocked IP is the SRC */
++        if (pfctl_kill_states(data->fd, &kill, &nkill)) {
++            SCLogError("AlertPfBlock(): pfctl_kill_states(): %s\n", strerror(errno));
++            states_err++;
 +        }
 +
-+        memset(&psk, 0, sizeof(psk));
-+        memset(&psk.psk_dst.addr.v.a.mask, 0xff, sizeof(psk.psk_dst.addr.v.a.mask));
-+        psk.psk_af = net_addr->family;
-+        if (psk.psk_af == AF_INET)
-+            psk.psk_dst.addr.v.a.addr.v4.s_addr = net_addr->addr_data32[0];
-+        else if (psk.psk_af == AF_INET6)
-+            memcpy(&psk.psk_dst.addr.v.a.addr.v6, net_addr->addr_data8, sizeof(psk.psk_dst.addr.v.a.addr.v6));
++        memset(&kill, 0, sizeof(kill));
++        memset(&kill.dst.addr.v.a.mask, 0xff, sizeof(kill.dst.addr.v.a.mask));
++        kill.af = net_addr->family;
++        if (kill.af == AF_INET)
++            kill.dst.addr.v.a.addr.v4.s_addr = net_addr->addr_data32[0];
++        else if (kill.af == AF_INET6)
++            memcpy(&kill.dst.addr.v.a.addr.v6, net_addr->addr_data8, sizeof(kill.dst.addr.v.a.addr.v6));
 +
-+        /* clear any open states where this IP is DST */
-+        if (ioctl(data->fd, DIOCKILLSTATES, &psk)) {
-+            SCLogError("AlertPfBlock(): ioctl() DIOCKILLSTATES: %s\n", strerror(errno));
-+            states_err = 1;
++        /* Kill any open firewall states where blocked IP is the DST */
++        if (pfctl_kill_states(data->fd, &kill, &nkill)) {
++            SCLogError("AlertPfBlock(): pfctl_kill_states(): %s\n", strerror(errno));
++            states_err++;
 +        }
 +
 +        if (states_err && data->ctx->passlist_dbg) {
@@ -516,7 +503,7 @@ diff -ruN ./suricata-7.0.0.orig/src/alert-pf.c ./suricata-7.0.0/src/alert-pf.c
 +    }
 +
 +    /* Return the number of effective IP blocks inserted */
-+    return (io.pfrio_nadd); 
++    return (nadd); 
 +}
 +
 +/** \brief Load and parse a single line of text from Pass List file
@@ -965,7 +952,6 @@ diff -ruN ./suricata-7.0.0.orig/src/alert-pf.c ./suricata-7.0.0/src/alert-pf.c
 +                    if ( (user_addr = SCCalloc(1, sizeof(struct in_addr))) == NULL) {
 +                        FatalError("Failed allocating memory in AlertPf_IflistMaint() for Radix Tree user data entry. Exiting...");
 +                    }
-+
 +                    COPY_ADDRESS(ip, user_addr);
 +                    SCRWLockWRLock(&ctx->rwlock_tree);
 +                    SCRadixAddKeyIPV4((uint8_t *)&ip->addr_data32, ctx->tree, user_addr);
@@ -985,7 +971,6 @@ diff -ruN ./suricata-7.0.0.orig/src/alert-pf.c ./suricata-7.0.0/src/alert-pf.c
 +                    if ( (user_addr = SCCalloc(1, sizeof(struct in6_addr))) == NULL) {
 +                        FatalError("Failed allocating memory in AlertPf_IflistMaint() for Radix Tree user data entry. Exiting...");
 +                    }
-+
 +                    COPY_ADDRESS(ip, user_addr);
 +                    SCRWLockWRLock(&ctx->rwlock_tree);
 +                    SCRadixAddKeyIPV6((uint8_t *)&ip->addr_data8, ctx->tree, user_addr);
@@ -1116,9 +1101,9 @@ diff -ruN ./suricata-7.0.0.orig/src/alert-pf.c ./suricata-7.0.0/src/alert-pf.c
 +void *AlertPfMonitorIfaceChanges(void *args)
 +{
 +    int sock = -1;
-+    int fib;
++    int fib = RT_ALL_FIBS;
 +    size_t fib_len = sizeof(fib);
-+    ssize_t len;
++    size_t len;
 +    char msg[MAX_RTMSG_SIZE];
 +    char ifname[IFNAMSIZ];
 +    char *p;
@@ -1129,7 +1114,7 @@ diff -ruN ./suricata-7.0.0.orig/src/alert-pf.c ./suricata-7.0.0/src/alert-pf.c
 +
 +    AlertPfCtx *ctx = args;
 +
-+    sock = socket(PF_ROUTE, SOCK_RAW, 0);
++    sock = socket(PF_ROUTE, SOCK_RAW, AF_UNSPEC);
 +    if (sock == -1) {
 +        SCLogWarning("Failed to create routing messages socket(PF_ROUTE): %s.  Dynamic IP changes on firewall interfaces will not be monitored!", strerror(errno));
 +        return (NULL);
@@ -1143,7 +1128,6 @@ diff -ruN ./suricata-7.0.0.orig/src/alert-pf.c ./suricata-7.0.0/src/alert-pf.c
 +        SCLogWarning("Failed to obtain active route table FIB so using all FIBs by default.");
 +        fib = RT_ALL_FIBS;
 +    }
-+
 +    setsockopt(sock, SOL_SOCKET, SO_SETFIB, (void *)&fib, sizeof(fib));
 +
 +    // Loop forever receiving and handling kernel RTM messages
@@ -1155,8 +1139,12 @@ diff -ruN ./suricata-7.0.0.orig/src/alert-pf.c ./suricata-7.0.0/src/alert-pf.c
 +        }
 +
 +        len = read(sock, &msg, sizeof(msg));
-+        if (len == -1)
++
++        // Disregard any route message not of the size we require
++        if (len < sizeof(struct ifa_msghdr))
 +            continue;
++        else
++            len -= sizeof(struct ifa_msghdr);
 +
 +        rtm = (struct rt_msghdr *)msg;
 +        if (rtm->rtm_version != RTM_VERSION)
@@ -1167,38 +1155,43 @@ diff -ruN ./suricata-7.0.0.orig/src/alert-pf.c ./suricata-7.0.0/src/alert-pf.c
 +        switch (rtm->rtm_type) {
 +            case RTM_NEWADDR:
 +            case RTM_DELADDR:
-+            // Make sure all address info we need is present in the message
-+            // by checking the RTAX bit mask.
-+            if (ifam->ifam_addrs != 0xb4)
++                // Make sure all address info we need is present in the message by checking the RTAX flags.
++                if (ifam->ifam_addrs & (RTAX_NETMASK | RTAX_IFP | RTAX_IFA | RTAX_BRD)) {
++
++                    // Get the interface address that is changing (will be third sockaddr in msg)
++                    p = (char *)(ifam + 1);
++                    p += SA_SIZE((struct sockaddr *)p);
++                    len -= SA_SIZE((struct sockaddr *)p);
++                    p += SA_SIZE((struct sockaddr *)p);
++                    len -= SA_SIZE((struct sockaddr *)p);
++                    sa = (struct sockaddr *)p;
++
++                    // If we've run out of data, skip this message as something is amiss
++                    if (len == 0 || len < SA_SIZE(sa))
++                        continue;
++
++                    // Zero out our Address structure prior to each call to parse it
++                    addr.family = 0;
++                    addr.addr_data32[0] = 0;
++                    addr.addr_data32[1] = 0;
++                    addr.addr_data32[2] = 0;
++                    addr.addr_data32[3] = 0;
++
++                    // Make sure we have a valid non-zero IP address in that sockaddr structure
++                    if (!AlertPfParseIfamAddress(sa, &addr)) {
++                        SCLogDebug("Firewall interface IP change notification thread received an invalid IP address via kernel routing message socket.");
++                        continue;
++                    }
++
++                    // OK, now either delete it from or add it to the interface IP list
++                    SCLogInfo("Received notification of IP address change on firewall interface %s.", if_indextoname(ifam->ifam_index, ifname));
++                    AlertPf_IflistMaint(&addr, ctx, rtm->rtm_type);
++                }
 +                continue;
-+            break;
 +
 +            default:
-+            continue;
++                continue;
 +        }
-+
-+        // Get the interface address that is changing (should be third sockaddr structure in msg)
-+        p = (char *)((char *)ifam + sizeof(struct ifa_msghdr));
-+        p += SA_SIZE((struct sockaddr *)p);
-+        p += SA_SIZE((struct sockaddr *)p);
-+        sa = (struct sockaddr *)p;
-+
-+        /* Zero out our Address structure prior to each call to parse it */
-+        addr.family = 0;
-+        addr.addr_data32[0] = 0;
-+        addr.addr_data32[1] = 0;
-+        addr.addr_data32[2] = 0;
-+        addr.addr_data32[3] = 0;
-+
-+        // Make sure we have a valid non-zero IP address in that sockaddr structure
-+        if (!AlertPfParseIfamAddress(sa, &addr)) {
-+            SCLogDebug("Firewall interface IP change notification thread received an invalid IP address via kernel routing message socket.");
-+            continue;
-+        }
-+
-+        // OK, now either delete it from or add it to the interface IP list
-+        SCLogInfo("Received notification of IP address change on firewall interface %s.", if_indextoname(ifam->ifam_index, ifname));
-+        AlertPf_IflistMaint(&addr, ctx, ifam->ifam_type);
 +    }
 +
 +    SCLogInfo("Firewall Interface IP Address Change monitoring thread IM#01 shutting down.");
@@ -1969,8 +1962,8 @@ diff -ruN ./suricata-7.0.0.orig/src/alert-pf.c ./suricata-7.0.0/src/alert-pf.c
 +
 +    return TM_ECODE_OK;
 +}
-diff -ruN ./suricata-7.0.0.orig/src/alert-pf.h ./suricata-7.0.0/src/alert-pf.h
---- ./suricata-7.0.0.orig/src/alert-pf.h	1969-12-31 19:00:00.000000000 -0500
+diff -ruN ./suricata-7.0.2.orig/src/alert-pf.h ./suricata-7.0.2/src/alert-pf.h
+--- ./suricata-7.0.2.orig/src/alert-pf.h	1969-12-31 19:00:00.000000000 -0500
 +++ ./src/alert-pf.h	2023-08-03 10:51:48.000000000 -0400
 @@ -0,0 +1,47 @@
 +/* Copyright (C) 2007-2023 Open Information Security Foundation
@@ -2020,8 +2013,8 @@ diff -ruN ./suricata-7.0.0.orig/src/alert-pf.h ./suricata-7.0.0/src/alert-pf.h
 +
 +#endif /* __ALERT_PF_H__ */
 +
-diff -ruN ./suricata-7.0.0.orig/src/output.c ./suricata-7.0.0/src/output.c
---- ./suricata-7.0.0.orig/src/output.c	2023-07-18 00:38:14.000000000 -0400
+diff -ruN ./suricata-7.0.2.orig/src/output.c ./suricata-7.0.2/src/output.c
+--- ./suricata-7.0.2.orig/src/output.c	2023-10-18 10:25:29.000000000 -0400
 +++ ./src/output.c	2023-08-03 09:32:26.000000000 -0400
 @@ -42,6 +42,7 @@
  
@@ -2040,10 +2033,10 @@ diff -ruN ./suricata-7.0.0.orig/src/output.c ./suricata-7.0.0/src/output.c
      /* syslog log */
      AlertSyslogRegister();
      JsonDropLogRegister();
-diff -ruN ./suricata-7.0.0.orig/src/suricata-common.h ./suricata-7.0.0/src/suricata-common.h
---- ./suricata-7.0.0.orig/src/suricata-common.h	2023-07-18 00:38:14.000000000 -0400
-+++ ./src/suricata-common.h	2023-08-03 09:37:23.000000000 -0400
-@@ -485,6 +485,7 @@
+diff -ruN ./suricata-7.0.2.orig/src/suricata-common.h ./suricata-7.0.2/src/suricata-common.h
+--- ./suricata-7.0.2.orig/src/suricata-common.h	2023-10-18 10:25:29.000000000 -0400
++++ ./src/suricata-common.h	2023-11-09 12:50:53.000000000 -0500
+@@ -489,6 +489,7 @@
      LOGGER_JSON_METADATA,
      LOGGER_JSON_FRAME,
      LOGGER_JSON_STREAM,

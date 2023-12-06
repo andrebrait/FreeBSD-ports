@@ -117,7 +117,6 @@
     SUBDIR += fortune-mod-futurama
     SUBDIR += fortune-mod-psalms
     SUBDIR += fortuneit
-    SUBDIR += fpc-chm
     SUBDIR += fq
     SUBDIR += free42
     SUBDIR += freebsd-doc-all
@@ -394,6 +393,9 @@
     SUBDIR += py-PyUserInput
     SUBDIR += py-PyWavefront
     SUBDIR += py-QSpectrumAnalyzer
+    SUBDIR += py-SQCommon
+    SUBDIR += py-SQImFil
+    SUBDIR += py-SQSnobFit
     SUBDIR += py-SimpleSoapy
     SUBDIR += py-SoapySDR
     SUBDIR += py-alive-progress
@@ -424,6 +426,8 @@
     SUBDIR += py-icoextract
     SUBDIR += py-ipyfastscape
     SUBDIR += py-kartograph
+    SUBDIR += py-laspy
+    SUBDIR += py-lazrs
     SUBDIR += py-lightgbm
     SUBDIR += py-lightning-utilities
     SUBDIR += py-log_symbols
@@ -465,6 +469,7 @@
     SUBDIR += py-pytorch-lightning
     SUBDIR += py-qiskit-machine-learning
     SUBDIR += py-scikit-fusion
+    SUBDIR += py-scikit-quant
     SUBDIR += py-serverfiles
     SUBDIR += py-shap2
     SUBDIR += py-shell-gpt

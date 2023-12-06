@@ -22,9 +22,9 @@ _QT_MK_INCLUDED=	qt.mk
 
 # Qt versions currently supported by the framework.
 _QT_SUPPORTED?=		5 6
-QT5_VERSION?=		5.15.10
-QT6_VERSION?=		6.5.3
-PYSIDE6_VERSION?=	6.5.3
+QT5_VERSION?=		5.15.11
+QT6_VERSION?=		6.6.0
+PYSIDE6_VERSION?=	6.6.0
 
 # We accept the Qt version to be passed by either or all of the three mk files.
 .  if empty(qt_ARGS) && empty(qmake_ARGS) && empty(qt-dist_ARGS)
@@ -112,6 +112,11 @@ PLIST_SUB+=		QT_${dir}DIR="${QT_${dir}DIR_REL}"
 .    endif
 .  endfor
 
+# Suppress warnings from rcc about not using a UTF-8 locale.
+.  if ${_QT_VER:M6}
+USE_LOCALE?=		C.UTF-8
+.  endif
+
 CONFIGURE_ENV+=		QT_SELECT=${_QT_RELNAME}
 MAKE_ENV+=		QT_SELECT=${_QT_RELNAME}
 
@@ -119,6 +124,12 @@ MAKE_ENV+=		QT_SELECT=${_QT_RELNAME}
 # found, with the ones from the port being built having preference.
 CONFIGURE_ENV+=		QMAKEMODULES="${WRKSRC}/mkspecs/modules:${LOCALBASE}/${QT_MKSPECDIR_REL}/modules"
 MAKE_ENV+=		QMAKEMODULES="${WRKSRC}/mkspecs/modules:${LOCALBASE}/${QT_MKSPECDIR_REL}/modules"
+
+# Qt uses generated linker version scripts which always have a qt_version_tag
+# symbol, but that symbol is only defined in the main Qt shared library. For
+# other Qt components, this leads to lld >= 17 erroring out due to the symbol
+# being undefined. Supress these errors.
+LDFLAGS+=		-Wl,--undefined-version
 
 _USES_POST+=		qt
 .endif # _QT_MK_INCLUDED
@@ -149,8 +160,8 @@ _USE_QT5_ONLY=		assistant buildtools concurrent core dbus \
 _USE_QT5_ONLY+=		sql-ibase
 .  endif
 
-_USE_QT6_ONLY=		5compat base httpserver languageserver lottie positioning \
-			quickeffectmaker shadertools tools translations \
+_USE_QT6_ONLY=		5compat base coap graphs httpserver languageserver lottie positioning \
+			quick3dphysics quickeffectmaker shadertools tools translations \
 			sqldriver-sqlite sqldriver-mysql sqldriver-psql sqldriver-odbc
 
 # Dependency tuples: _LIB should be preferred if possible.
@@ -172,6 +183,9 @@ qt-base_LIB=		libQt${_QT_LIBVER}Core.so
 
 qt-charts_PORT=		x11-toolkits/${_QT_RELNAME}-charts
 qt-charts_LIB=		libQt${_QT_LIBVER}Charts.so
+
+qt-coap_PORT=		net/${_QT_RELNAME}-coap
+qt-coap_LIB=		libQt${_QT_LIBVER}Coap.so
 
 qt-concurrent_PORT=	devel/${_QT_RELNAME}-concurrent
 qt-concurrent_LIB=	libQt${_QT_LIBVER}Concurrent.so
@@ -211,6 +225,9 @@ qt-gamepad_LIB=		libQt${_QT_LIBVER}Gamepad.so
 
 qt-graphicaleffects_PORT=	graphics/${_QT_RELNAME}-graphicaleffects
 qt-graphicaleffects_PATH=	${LOCALBASE}/${QT_QMLDIR_REL}/QtGraphicalEffects/qmldir
+
+qt-graphs_PORT=		x11-toolkits/${_QT_RELNAME}-graphs
+qt-graphs_LIB=		libQt${_QT_LIBVER}Graphs.so
 
 qt-gui_PORT=		x11-toolkits/${_QT_RELNAME}-gui
 qt-gui_LIB=		libQt${_QT_LIBVER}Gui.so
@@ -293,6 +310,9 @@ qt-qmake_PATH=		${_QT_RELNAME}-qmake>=${_QT_VERSION:R}
 
 qt-quick3d_PORT=	x11-toolkits/${_QT_RELNAME}-quick3d
 qt-quick3d_LIB=		libQt${_QT_LIBVER}Quick3D.so
+
+qt-quick3dphysics_PORT=	science/${_QT_RELNAME}-quick3dphysics
+qt_quick3dphysics_LIB=	libQt${_QT_LIBVER}Quick3DPhysics.so
 
 qt-quickcontrols_PORT=	x11-toolkits/${_QT_RELNAME}-quickcontrols
 qt-quickcontrols_PATH=	${LOCALBASE}/${QT_QMLDIR_REL}/QtQuick/Controls/qmldir
