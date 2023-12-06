@@ -1,7 +1,6 @@
 PORTNAME=	gqrx
-PORTVERSION=	2.17.2
+PORTVERSION=	2.17.3
 DISTVERSIONPREFIX=	v
-PORTREVISION=	1
 PORTEPOCH=	1
 CATEGORIES=	comms hamradio
 PKGNAMESUFFIX=	-${FLAVOR}
@@ -33,7 +32,7 @@ LIB_DEPENDS=	libgnuradio-runtime.so:comms/gnuradio \
 		libjack.so:audio/jack \
 		libportaudio.so:audio/portaudio
 
-FLAVORS=	qt5 qt6
+FLAVORS=	qt6 qt5
 FLAVOR?=	qt6
 
 USES=		cmake compiler:c++11-lang gl pkgconfig qt:${FLAVOR:S/qt//}

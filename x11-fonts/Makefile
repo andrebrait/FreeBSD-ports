@@ -114,7 +114,6 @@
     SUBDIR += fontpreview
     SUBDIR += fonts-indic
     SUBDIR += fonttosfnt
-    SUBDIR += fpc-libfontconfig
     SUBDIR += freefont-ttf
     SUBDIR += freefonts
     SUBDIR += fslsfonts
@@ -130,7 +129,6 @@
     SUBDIR += genyog
     SUBDIR += gnu-unifont
     SUBDIR += gnu-unifont-otf
-    SUBDIR += gnu-unifont-ttf
     SUBDIR += gofont-ttf
     SUBDIR += gohufont
     SUBDIR += google-fonts
@@ -179,6 +177,7 @@
     SUBDIR += mkbold-mkitalic
     SUBDIR += mkfontscale
     SUBDIR += mkitalic
+    SUBDIR += monaspace
     SUBDIR += mondulkiri
     SUBDIR += monoid
     SUBDIR += montecarlo_fonts

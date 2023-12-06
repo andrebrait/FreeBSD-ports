@@ -1,5 +1,5 @@
 PORTNAME=	openssl
-PORTVERSION=	3.1.3
+PORTVERSION=	3.1.4
 PORTREVISION=	1
 CATEGORIES=	security devel
 MASTER_SITES=	https://www.openssl.org/source/ \
@@ -13,7 +13,9 @@ WWW=		https://www.openssl.org/
 LICENSE=	APACHE20
 LICENSE_FILE=	${WRKSRC}/LICENSE.txt
 
-CONFLICTS_INSTALL=	boringssl libressl libressl-devel openssl openssl3[02] openssl-quictls
+#EXPIRATION_DATE=	2025-03-14
+
+CONFLICTS_INSTALL=	boringssl libressl libressl-devel openssl openssl111 openssl32 openssl-quictls
 
 HAS_CONFIGURE=	yes
 CONFIGURE_SCRIPT=	config
@@ -131,6 +133,8 @@ SSL3_CONFIGURE_ON+=	enable-ssl3-method
 ZLIB_CONFIGURE_ON=	zlib-dynamic
 
 SHLIBS=			lib/engines-${OPENSSL_SHLIBVER}/loader_attic.so
+
+PORTSCOUT=		limit=^3\.1\.
 
 .include <bsd.port.options.mk>
 
