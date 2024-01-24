@@ -1686,7 +1686,7 @@ def operate(id, event, qstate, qdata):
 
             q_ip = get_q_ip(qstate)
             if q_ip != 'Unknown' and q_ip in gpListDB:
-                debug('[{}]: bypassing DNSBQ due to Group Policy match for IP {}', q_name_original, q_ip)
+                debug('[{}]: bypassing DNSBL due to Group Policy match for IP {}', q_name_original, q_ip)
                 bypass_dnsbl = True
 
         # Create list of Domain/CNAMES to be evaluated
@@ -1806,14 +1806,12 @@ def operate(id, event, qstate, qdata):
                 # Determine if TLD is in HSTS database
                 if tld in pfb['hsts_tlds']:
                     debug('[{}]: found TLD in HSTS: {}: {}', q_name_original, block_name, tld)
-                    isInHsts = True
                     p_type = 'HSTS_TLD'
                 else:
                     q = q_name
                     for _ in range(q.count('.') + 1, 0, -2):
                         if q in hstsDB:
                             debug('[{}]: found HSTS blacklist entry: {}: {}', q_name_original, block_name, q)
-                            isInHsts = True
                             if q_type_str in pfb['rr_types2']:
                                 p_type = 'HSTS_{}'.format(q_type_str)
                             else:
@@ -1847,10 +1845,14 @@ def operate(id, event, qstate, qdata):
         if block_result:
 
             (q_name, p_type, log_type, feed, group, b_eval) = (block_result['q_name'], block_result['p_type'], block_result['log'], block_result['feed'], block_result['group'], block_result['b_eval'])
-            isInHsts = p_type.startswith('HSTS')
 
             # Determine blocked IP type (DNSBL VIP vs Null Blocking)
-            if not isInHsts:
+            if p_type.startswith('HSTS'):
+                if q_type_str in pfb['rr_types2']:
+                    b_ip = pfb['dnsbl_ip'][q_type_str]['0']
+                else:
+                    b_ip = pfb['dnsbl_ip']['A']['0']
+            else:
                 # A/AAAA RR_Types
                 if q_type_str in pfb['rr_types2']:
                     if log_type:
@@ -1864,12 +1866,6 @@ def operate(id, event, qstate, qdata):
                         b_ip = pfb['dnsbl_ip']['A'][log_type]
                     else:
                         b_ip = pfb['dnsbl_ip']['A']['0']
-
-            else:
-                if q_type_str in pfb['rr_types2']:
-                    b_ip = pfb['dnsbl_ip'][q_type_str]['0']
-                else:
-                    b_ip = pfb['dnsbl_ip']['A']['0']
 
             # Default RR_TYPE ANY -> A
             if q_type == RR_TYPE_ANY:

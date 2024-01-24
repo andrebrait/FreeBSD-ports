@@ -403,6 +403,7 @@ dnsbl_scrub() {
 	rm -f "${pfbdomain}${alias}.bk2"
 
 	# Sort and count the AdBlock exclusions
+	rm -f "${pfbdomain}${alias}.wk2"
 	if [ -s "${pfbdomain}${alias}.wk" ]; then
 		sort "${pfbdomain}${alias}.wk" | uniq > "${pfbdomain}${alias}.wk2"
 		mv -f "${pfbdomain}${alias}.wk2" "${pfbdomain}${alias}.wk"
