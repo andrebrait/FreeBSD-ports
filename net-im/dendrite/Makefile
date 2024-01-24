@@ -1,6 +1,6 @@
 PORTNAME=	dendrite
 DISTVERSIONPREFIX=	v
-DISTVERSION=	0.13.4
+DISTVERSION=	0.13.5
 CATEGORIES=	net-im
 
 MAINTAINER=	ashish@FreeBSD.org
@@ -27,10 +27,6 @@ GO_TARGET+=	./cmd/$f:${PREFIX}/dendrite/bin/$f
 .endfor
 
 GO_MODULE=	github.com/matrix-org/dendrite
-
-post-extract:
-	@${MKDIR} ${WRKSRC}/vendor/github.com/golang
-	@${RLN} ${WRKSRC_fsnotify_fsnotify} ${WRKSRC}/vendor/github.com/golang/mock
 
 post-install:
 	${MKDIR} ${STAGEDIR}${ETCDIR} ${STAGEDIR}${DOCSDIR}
