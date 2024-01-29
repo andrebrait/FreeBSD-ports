@@ -121,7 +121,7 @@ $pfb_logtypes = array(	'defaultlogs'	=> array('name'		=> 'Log Files',
 						'clear'		=> TRUE
 						),
 			'dnsbl'		=> array('name'		=> 'DNSBL Files',
-						'ext'		=> array('txt', 'ip', 'whitelist'),
+						'ext'		=> array('txt', 'ip', 'exclusions'),
 						'txt'		=> 'dnsbl',
 						'logdir'	=> "{$pfb['dnsdir']}/",
 						'download'	=> TRUE,

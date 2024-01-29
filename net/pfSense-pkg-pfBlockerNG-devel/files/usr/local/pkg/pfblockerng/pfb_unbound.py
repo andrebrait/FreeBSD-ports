@@ -170,7 +170,7 @@ def bootstrap_logging():
 @traced
 @exception_logger
 def init(id, env):
-    global pfb, rcodeDB, dataDB, wildcardDataDB, zoneDB, regexDataDB, regexDB, hstsDB, whiteDB, wildcardWhiteDB, regexWhiteDB, excludeDB, excludeAAAADB, excludeSS, dnsblDB, noAAAADB, gpListDB, safeSearchDB, maxmindReader, segmentSizeDB
+    global pfb, rcodeDB, dataDB, wildcardDataDB, zoneDB, regexDataDB, regexDB, hstsDB, whiteDB, wildcardWhiteDB, regexWhiteDB, exclusion_cache, excludeAAAADB, excludeSS, block_cache, noAAAADB, gpListDB, safeSearchDB, maxmindReader, segmentSizeDB
 
     if not register_inplace_cb_reply(inplace_cb_reply, env, id):
         log_info('[pfBlockerNG]: Failed register_inplace_cb_reply')
@@ -271,7 +271,6 @@ def init(id, env):
     wildcardWhiteDB = dict()
     regexWhiteDB = dict()
     zoneDB = dict()
-    dnsblDB = dict()
     safeSearchDB = dict()
     segmentSizeDB = {'wildcardDataDB': pow(2, 32), 'wildcardWhiteDB': pow(2, 32), 'zoneDB': pow(2, 32)}
 
@@ -279,9 +278,11 @@ def init(id, env):
     hstsDB = set()
     gpListDB = set()
     noAAAADB = dict()
-    excludeDB = dict()
     excludeAAAADB = set()
     excludeSS = set()
+
+    exclusion_cache = dict()
+    block_cache = dict()
 
     # String deduplication for in-memory databases
     # Less invasive than String interning, gets collected at the end of initialization
@@ -512,7 +513,8 @@ def init(id, env):
 
             if pfb['python_blacklist']:
 
-                # Collect user-defined and downloaded Whitelists
+                # TODO: separate user whitelist and DNSBL exclusions
+                # Collect whitelists and DNSBL exclusions
                 if os.path.isfile(pfb['pfb_py_whitelist']):
                     try:
                         with open(pfb['pfb_py_whitelist']) as csv_file:
@@ -907,14 +909,14 @@ def format_b_type(b_type, q_type, isCNAME):
 
 @traced
 def get_details_dnsbl(q_name, q_ip, q_type, isCNAME):
-    global pfb, dnsblDB
+    global pfb, block_cache
 
     # Increment totalqueries counter
     if pfb['sqlite3_resolver_con']:
         write_sqlite_async(1, '', True)
 
     # Determine if event is a 'reply' or DNSBL block
-    isDNSBL = dnsblDB.get(q_name)
+    isDNSBL = block_cache.get(q_name)
     if isDNSBL is not None:
 
         # If logging is disabled, do not log blocked DNSBL events (Utilize DNSBL Webserver) except for Python nullblock events
@@ -926,11 +928,11 @@ def get_details_dnsbl(q_name, q_ip, q_type, isCNAME):
             write_sqlite_async(2, isDNSBL['group'], True)
 
         dupEntry = '+'
-        lastEvent = dnsblDB.get('last-event')
+        lastEvent = block_cache.get('last-event')
         if lastEvent is not None and lastEvent == isDNSBL:
             dupEntry = '-'
         else:
-            dnsblDB['last-event'] = isDNSBL
+            block_cache['last-event'] = isDNSBL
 
         # Skip logging
         if isDNSBL['log'] == '2':
@@ -1014,7 +1016,7 @@ def debug(format_str, *args):
 
 @traced
 def get_details_reply(m_type, qinfo, qstate, rep, kwargs):
-    global pfb, rcodeDB, dnsblDB, noAAAADB, maxmindReader
+    global pfb, rcodeDB, block_cache, noAAAADB, maxmindReader
 
     if qstate and qstate is not None:
         q_name = get_q_name_qstate(qstate)
@@ -1450,7 +1452,7 @@ def whitelist_lookup(q_name, user_only=False):
 @traced
 @exception_logger
 def operate(id, event, qstate, qdata):
-    global pfb, threads, dataDB, zoneDB, wildcardDataDB, regexDataDB, hstsDB, whiteDB, wildcardWhiteDB, regexWhiteDB, excludeDB, excludeAAAADB, excludeSS, dnsblDB, noAAAADB, gpListDB, safeSearchDB, feedGroupDB, segmentSizeDB
+    global pfb, threads, dataDB, zoneDB, wildcardDataDB, regexDataDB, hstsDB, whiteDB, wildcardWhiteDB, regexWhiteDB, exclusion_cache, excludeAAAADB, excludeSS, block_cache, noAAAADB, gpListDB, safeSearchDB, feedGroupDB, segmentSizeDB
 
     qstate_valid = False
     try:
@@ -1725,8 +1727,8 @@ def operate(id, event, qstate, qdata):
         whitelist_match = None
         whitelist_name = None
 
-        cached_block = False
-        cached_exclusion = False
+        is_cached_block = False
+        is_cached_exclusion = False
 
         tld = get_tld(qstate)
 
@@ -1735,22 +1737,21 @@ def operate(id, event, qstate, qdata):
 
             debug('[{}]: checking cache for domain name: {}', q_name_original, q_name)
 
-            q_cached_block = False
-            q_cached_exclusion = False
+            q_is_cached_block = False
 
             # Determine if domain was previously DNSBL blocked
-            q_block_result = dnsblDB.get(q_name)
+            cached_block = block_cache.get(q_name)
 
-            if q_block_result:
-                q_block_match = q_block_result['b_eval']
+            if cached_block:
+                (q_block_result, q_block_match) = (cached_block, q_block_result['b_eval'])
                 debug('[{}]: found domain name in DNSBL cache: {} (matching: {}): {}', q_name_original, q_name, q_block_match, q_block_result)
-                q_cached_block = True
+                q_is_cached_block = True
             else:
                 (q_block_result, q_block_match) = block_lookup(q_name, tld)
 
             if q_block_result:
                 debug('[{}]: domain blacklisted: {} (matching: {}): {}', q_name_original, q_name, q_block_match, q_block_result)
-                (block_result, block_match, block_name, cached_block) = (q_block_result, q_block_match, q_name, q_cached_block)
+                (block_result, block_match, block_name, is_cached_block) = (q_block_result, q_block_match, q_name, q_is_cached_block)
                 if val_counter > 1:
                     isCNAME = True
                 if block_result['b_type'] == 'Python':
@@ -1759,23 +1760,21 @@ def operate(id, event, qstate, qdata):
         if block_result:
             for val_counter, q_name in enumerate(validate, start=1):
 
-                q_whitelist_result = None
-                q_whitelist_match = None
+                q_is_cached_exclusion = False
 
                 # Determine if domain has been previously validated
-                cached_whitelist = excludeDB.get(q_name)
-                if cached_whitelist:
-                    (q_whitelist_result, q_whitelist_match) = cached_whitelist
+                cached_exclusion = exclusion_cache.get(q_name)
 
-                if q_whitelist_result:
+                if cached_exclusion:
+                    (q_whitelist_result, q_whitelist_match) = cached_exclusion
                     debug('[{}]: domain found in exclusion cache: {} (matching: {}): {}', q_name_original, q_name, q_whitelist_match, q_whitelist_result)
-                    q_cached_exclusion = True
+                    q_is_cached_exclusion = True
                 else:
                     (q_whitelist_result, q_whitelist_match) = whitelist_lookup(q_name, user_only=(block_result['b_type'] == 'Python'))
 
                 if q_whitelist_result:
                     debug('[{}]: domain excluded: {} (matching: {}): {}', q_name_original, q_name, q_whitelist_match, q_whitelist_result)
-                    (whitelist_result, whitelist_match, whitelist_name, cached_exclusion) = (q_whitelist_result, q_whitelist_match, q_name, q_cached_exclusion)
+                    (whitelist_result, whitelist_match, whitelist_name, is_cached_exclusion) = (q_whitelist_result, q_whitelist_match, q_name, q_is_cached_exclusion)
                     if whitelist_result['b_type'] == 'USER':
                         break
 
@@ -1783,19 +1782,19 @@ def operate(id, event, qstate, qdata):
             debug('[{}]: exclusion has priority over DNSBL entry. DNSBL: {} (matching: {}): {}. Exclusion (matching: {}): {}.', q_name_original, block_name, block_result, block_match, whitelist_name, whitelist_match, whitelist_result)                
             (block_result, block_match, block_name) = (None, None, None)
             
-            if not cached_exclusion:
+            if not is_cached_exclusion:
 
                 # Cache for all validated CNAMEs
                 for q_name in validate:
 
                     # Skip entries already present - except for the whitelisted domain itself
-                    if q_name != whitelist_name and q_name in excludeDB:
+                    if q_name != whitelist_name and q_name in exclusion_cache:
                         continue
 
                     debug('[{}]: adding entry to exclusion cache: {} (matching: {}): {}', q_name_original, q_name, whitelist_match, whitelist_result)
-                    excludeDB[q_name] = (whitelist_result, whitelist_match)
+                    exclusion_cache[q_name] = (whitelist_result, whitelist_match)
         
-        if block_result and not cached_block:
+        if block_result and not is_cached_block:
 
             p_type = 'Python'
             
@@ -1826,13 +1825,13 @@ def operate(id, event, qstate, qdata):
             for q_name in validate:
 
                 # Skip entries already present - except for the blocked domain itself
-                if q_name != block_name and q_name in dnsblDB:
+                if q_name != block_name and q_name in block_cache:
                     continue
 
                 # Add domain to dict for get_details_dnsbl function
                 entry = {'q_name': q_name, 'b_type': b_type, 'p_type': p_type, 'key': key, 'log': log_type, 'feed': feed, 'group': group, 'b_eval': b_eval}
                 debug('[{}]: adding entry to DNSBL cache: {}: {}', q_name_original, q_name, entry)
-                dnsblDB[q_name] = entry
+                block_cache[q_name] = entry
 
                 # Replace block result reference with cached reference
                 if q_name == block_name:
