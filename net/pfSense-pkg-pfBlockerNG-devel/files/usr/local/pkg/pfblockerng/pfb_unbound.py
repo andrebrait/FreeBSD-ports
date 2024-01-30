@@ -970,9 +970,9 @@ def log_entry(line, log):
                 append_log.write(line)
                 append_log.write('\n')
                 break
-        except Exception as e:
+        except:
             if i == 4:
-                sys.stderr.write("[pfBlockerNG]: log_entry: {}: {}".format(i, e))
+                sys.stderr.write("[pfBlockerNG]: Exception caught in log_entry(line='{}', log='{}'): \n\t{}".format(line, log, '\t'.join(traceback.format_exc().splitlines(True))))
             else:
                 time.sleep(0.25)
             pass
@@ -982,13 +982,8 @@ def _debug(format_str, *args):
     global pfb
     if pfb.get('python_debug') and isinstance(format_str, str):
         with open('/var/log/pfblockerng/py_debug.log', 'a') as append_log:
-            append_log.write(datetime.now().strftime("%b %-d %H:%M:%S"))
-            append_log.write('|DEBUG: ')
-            if args:
-                append_log.write(format_str.format(*args))
-            else:
-                append_log.write(format_str)
-            append_log.write('\n')
+            timestamp = datetime.now().strftime("%b %-d %H:%M:%S")
+            append_log.write('{}|DEBUG: {}\n'.format(timestamp, format_str.format(*args) if args else format_str))
 
 # Helper function for using async I/O
 def __debug(format_str, *args):
@@ -996,9 +991,9 @@ def __debug(format_str, *args):
         try:
             _debug(format_str, *args)
             break
-        except Exception as e:
+        except:
             if i == 4:
-                sys.stderr.write("[pfBlockerNG]: log_entry: {}: {}".format(i, e))
+                sys.stderr.write("[pfBlockerNG]: Exception caught in _debug(format_str='{}', args={}): \n\t{}".format(format_str, args, '\t'.join(traceback.format_exc().splitlines(True))))
             else:
                 time.sleep(0.25)
             pass
@@ -1445,7 +1440,7 @@ def whitelist_lookup(q_name, user_only=False):
 
     # Set log data, if we got a match
     if result:
-        debug('Found Whitelist entry for: {} (matching: {}): {}', q_name, result)
+        debug('Found Whitelist entry for: {} (matching: {}): {}', q_name, match, result)
     
     return (result,  match)
 
@@ -1732,29 +1727,30 @@ def operate(id, event, qstate, qdata):
 
         tld = get_tld(qstate)
 
+        debug('[{}]: got TLD: {}', q_name_original, tld)
+
         # Determine highest priority blacklist and whitelist entries for this query
         for val_counter, q_name in enumerate(validate, start=1):
 
-            debug('[{}]: checking cache for domain name: {}', q_name_original, q_name)
-
             q_is_cached_block = False
 
-            # Determine if domain was previously DNSBL blocked
+            # Determine if domain was previously blocked
+            debug('[{}]: checking block cache for domain name: {}', q_name_original, q_name)
             cached_block = block_cache.get(q_name)
-
             if cached_block:
-                (q_block_result, q_block_match) = (cached_block, q_block_result['b_eval'])
-                debug('[{}]: found domain name in DNSBL cache: {} (matching: {}): {}', q_name_original, q_name, q_block_match, q_block_result)
+                (q_block_result, q_block_match) = (cached_block, cached_block['b_eval'])
+                debug('[{}]: found domain name in block cache: {} (matching: {}): {}', q_name_original, q_name, q_block_match, q_block_result)
                 q_is_cached_block = True
             else:
                 (q_block_result, q_block_match) = block_lookup(q_name, tld)
 
             if q_block_result:
-                debug('[{}]: domain blacklisted: {} (matching: {}): {}', q_name_original, q_name, q_block_match, q_block_result)
+                debug('[{}]: domain blocked: {} (matching: {}): {}', q_name_original, q_name, q_block_match, q_block_result)
                 (block_result, block_match, block_name, is_cached_block) = (q_block_result, q_block_match, q_name, q_is_cached_block)
                 if val_counter > 1:
                     isCNAME = True
                 if block_result['b_type'] == 'Python':
+                    # This is the type of blocking with the highest precedence, so skip all other checks
                     break
 
         if block_result:
@@ -1762,9 +1758,9 @@ def operate(id, event, qstate, qdata):
 
                 q_is_cached_exclusion = False
 
-                # Determine if domain has been previously validated
+                # Determine if domain has been previously excluded
+                debug('[{}]: checking exclusion cache for domain name: {}', q_name_original, q_name)
                 cached_exclusion = exclusion_cache.get(q_name)
-
                 if cached_exclusion:
                     (q_whitelist_result, q_whitelist_match) = cached_exclusion
                     debug('[{}]: domain found in exclusion cache: {} (matching: {}): {}', q_name_original, q_name, q_whitelist_match, q_whitelist_result)
@@ -1775,24 +1771,32 @@ def operate(id, event, qstate, qdata):
                 if q_whitelist_result:
                     debug('[{}]: domain excluded: {} (matching: {}): {}', q_name_original, q_name, q_whitelist_match, q_whitelist_result)
                     (whitelist_result, whitelist_match, whitelist_name, is_cached_exclusion) = (q_whitelist_result, q_whitelist_match, q_name, q_is_cached_exclusion)
-                    if whitelist_result['b_type'] == 'USER':
+                    if whitelist_result['group'] == 'USER':
+                        # This is the type of exclusion with the highest precedence, so skip all other checks
                         break
 
-        if block_result and whitelist_result and (block_result['b_type'] != 'Python' or whitelist_result['b_type'] == 'USER'):
-            debug('[{}]: exclusion has priority over DNSBL entry. DNSBL: {} (matching: {}): {}. Exclusion (matching: {}): {}.', q_name_original, block_name, block_result, block_match, whitelist_name, whitelist_match, whitelist_result)                
-            (block_result, block_match, block_name) = (None, None, None)
-            
-            if not is_cached_exclusion:
+        # Exclusion has higher precendence than block, except for block of type Python (which means either user-defined block, regex block, etc.)
+        # User-defined exclusion ("whitelist") has the highest precedence, though.
+        # Whitelist > Block (Python) > Exclusion > Block
+        if block_result and whitelist_result:
+            if block_result['b_type'] != 'Python' or whitelist_result['group'] == 'USER':
+                debug('[{}]: exclusion has priority over block entry. Block: {} (matching: {}): {}. Exclusion: {} (matching: {}): {}.', q_name_original, block_name, block_match, block_result, whitelist_name, whitelist_match, whitelist_result)                
+                (block_result, block_match, block_name) = (None, None, None)
 
-                # Cache for all validated CNAMEs
-                for q_name in validate:
+                if not is_cached_exclusion:
 
-                    # Skip entries already present - except for the whitelisted domain itself
-                    if q_name != whitelist_name and q_name in exclusion_cache:
-                        continue
+                    # Cache for all validated CNAMEs
+                    for q_name in validate:
 
-                    debug('[{}]: adding entry to exclusion cache: {} (matching: {}): {}', q_name_original, q_name, whitelist_match, whitelist_result)
-                    exclusion_cache[q_name] = (whitelist_result, whitelist_match)
+                        # Skip entries already present - except for the whitelisted domain itself
+                        if q_name != whitelist_name and q_name in exclusion_cache:
+                            continue
+
+                        debug('[{}]: adding entry to exclusion cache: {} (matching: {}): {}', q_name_original, q_name, whitelist_match, whitelist_result)
+                        exclusion_cache[q_name] = (whitelist_result, whitelist_match)
+            else:
+                debug('[{}]: block has priority over exclusion entry. Block: {} (matching: {}): {}. Exclusion: {} (matching: {}): {}.', q_name_original, block_name, block_match, block_result, whitelist_name, whitelist_match, whitelist_result)                
+
         
         if block_result and not is_cached_block:
 
@@ -1830,14 +1834,14 @@ def operate(id, event, qstate, qdata):
 
                 # Add domain to dict for get_details_dnsbl function
                 entry = {'q_name': q_name, 'b_type': b_type, 'p_type': p_type, 'key': key, 'log': log_type, 'feed': feed, 'group': group, 'b_eval': b_eval}
-                debug('[{}]: adding entry to DNSBL cache: {}: {}', q_name_original, q_name, entry)
+                debug('[{}]: adding entry to block cache: {}: {}', q_name_original, q_name, entry)
                 block_cache[q_name] = entry
 
                 # Replace block result reference with cached reference
                 if q_name == block_name:
                     block_result = entry
 
-                # Add domain data to DNSBL cache for Reports tab
+                # Add domain data to block cache for Reports tab
                 write_sqlite_async(3, '', [format_b_type(b_type, q_type_str, isCNAME), q_name, group, b_eval, feed])
 
         # Use previously blocked domain details
