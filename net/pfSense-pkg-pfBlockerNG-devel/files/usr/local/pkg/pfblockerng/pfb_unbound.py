@@ -170,7 +170,7 @@ def bootstrap_logging():
 @traced
 @exception_logger
 def init(id, env):
-    global pfb, rcodeDB, dataDB, wildcardDataDB, zoneDB, regexDataDB, regexDB, hstsDB, whiteDB, wildcardWhiteDB, regexWhiteDB, exclusion_cache, excludeAAAADB, excludeSS, block_cache, noAAAADB, gpListDB, safeSearchDB, maxmindReader, segmentSizeDB
+    global pfb, rcodeDB, dataDB, wildcardDataDB, zoneDB, regexDataDB, regexDB, hstsDB, whiteDB, wildcardWhiteDB, regexWhiteDB, excludeAAAADB, excludeSS, block_cache, exclusion_cache, noAAAADB, gpListDB, safeSearchDB, maxmindReader, segmentSizeDB
 
     if not register_inplace_cb_reply(inplace_cb_reply, env, id):
         log_info('[pfBlockerNG]: Failed register_inplace_cb_reply')
@@ -748,8 +748,6 @@ def get_tld(qstate):
 
 @traced
 def convert_ipv4(x):
-    global pfb
-
     ipv4 = ''
     if x:
         ipv4 = "{}.{}.{}.{}" .format(x[2], x[3], x[4], x[5])
@@ -757,8 +755,6 @@ def convert_ipv4(x):
 
 @traced
 def convert_ipv6(x):
-    global pfb
-
     ipv6 = ''
     if x:
         ipv6 = "{:02x}{:02x}:{:02x}{:02x}:{:02x}{:02x}:{:02x}{:02x}:{:02x}{:02x}:{:02x}{:02x}:{:02x}{:02x}:{:02x}{:02x}" \
@@ -767,8 +763,6 @@ def convert_ipv6(x):
 
 @traced
 def convert_other(x):
-    global pfb
-
     final = ''
     if x:
         for i in x[3:]:
@@ -916,33 +910,39 @@ def get_details_dnsbl(q_name, q_ip, q_type, isCNAME):
         write_sqlite_async(1, '', True)
 
     # Determine if event is a 'reply' or DNSBL block
-    isDNSBL = block_cache.get(q_name)
-    if isDNSBL is not None:
+    cached_block = block_cache.get(q_name)
+    if cached_block:
+
+        block_result = cached_block['entry']
+        if not block_result:
+            # Negative cached result, skip it
+            return True
 
         # If logging is disabled, do not log blocked DNSBL events (Utilize DNSBL Webserver) except for Python nullblock events
-        if pfb['python_nolog'] and not isDNSBL['b_ip'] in ('0.0.0.0', '::'):
+        if pfb['python_nolog'] and not block_result['b_ip'] in ('0.0.0.0', '::'):
             return True
 
         # Increment dnsblgroup counter
-        if pfb['sqlite3_dnsbl_con'] and isDNSBL['group'] != '':
-            write_sqlite_async(2, isDNSBL['group'], True)
+        if pfb['sqlite3_dnsbl_con'] and block_result['group'] != '':
+            write_sqlite_async(2, block_result['group'], True)
 
         dupEntry = '+'
         lastEvent = block_cache.get('last-event')
-        if lastEvent is not None and lastEvent == isDNSBL:
+        if lastEvent and lastEvent == cached_block:
             dupEntry = '-'
         else:
-            block_cache['last-event'] = isDNSBL
+            block_cache['last-event'] = cached_block
 
         # Skip logging
-        if isDNSBL['log'] == '2':
+        if block_result['log'] == '2':
             return True
 
         q_ip = is_unknown(q_ip)
         if q_ip == 'Unknown':
             q_ip = '127.0.0.1'
 
-        for i in range(2):
+        timestamp = 'TIME_UNAVAILABLE'
+        for _ in range(2):
             try:
                 timestamp = datetime.now().strftime("%b %-d %H:%M:%S")
             except TypeError:
@@ -950,9 +950,9 @@ def get_details_dnsbl(q_name, q_ip, q_type, isCNAME):
                 continue
             break
 
-        b_type = format_b_type(isDNSBL['b_type'], q_type, isCNAME)
+        b_type = format_b_type(block_result['b_type'], q_type, isCNAME)
 
-        csv_line = ','.join(str(v) for v in ('DNSBL-python', timestamp, q_name, q_ip, isDNSBL['p_type'], b_type, isDNSBL['group'], isDNSBL['b_eval'], isDNSBL['feed'], dupEntry))
+        csv_line = ','.join(str(v) for v in ('DNSBL-python', timestamp, q_name, q_ip, block_result['p_type'], b_type, block_result['group'], block_result['b_eval'], block_result['feed'], dupEntry))
         if pfb['async_io']:
             executor = pfb['async_io_executor']
             executor.submit(log_entry, csv_line, '/var/log/pfblockerng/dnsbl.log')
@@ -1447,7 +1447,7 @@ def whitelist_lookup(q_name, user_only=False):
 @traced
 @exception_logger
 def operate(id, event, qstate, qdata):
-    global pfb, threads, dataDB, zoneDB, wildcardDataDB, regexDataDB, hstsDB, whiteDB, wildcardWhiteDB, regexWhiteDB, exclusion_cache, excludeAAAADB, excludeSS, block_cache, noAAAADB, gpListDB, safeSearchDB, feedGroupDB, segmentSizeDB
+    global pfb, threads, dataDB, zoneDB, wildcardDataDB, regexDataDB, hstsDB, whiteDB, wildcardWhiteDB, regexWhiteDB, excludeAAAADB, excludeSS, block_cache, exclusion_cache, noAAAADB, gpListDB, safeSearchDB, feedGroupDB, segmentSizeDB
 
     qstate_valid = False
     try:
@@ -1470,11 +1470,11 @@ def operate(id, event, qstate, qdata):
         if qstate_valid and q_type == RR_TYPE_AAAA and noAAAADB and q_name_original not in excludeAAAADB:
 
             debug('[{}]: checking no-AAAA DB', q_name_original)
-            (isnoAAAA, _) = lookup(noAAAADB, q_name_original)
+            (isnoAAAA, isnoAAA_match) = lookup(noAAAADB, q_name_original)
 
             # Create FQDN Reply Message (AAAA -> A)
             if isnoAAAA:
-                debug('[{}]: domain found in no-AAAA DB. Creating FQDN Reply Message (AAAA -> A)', q_name_original)
+                debug('[{}]: domain found in no-AAAA DB (matching: {}). Creating FQDN Reply Message (AAAA -> A)', q_name_original, isnoAAA_match)
                 msg = DNSMessage(qstate.qinfo.qname_str, RR_TYPE_A, RR_CLASS_IN, PKT_QR | PKT_RA)
                 if msg is None or not msg.set_return_msg(qstate):
                     qstate.ext_state[id] = MODULE_ERROR
@@ -1497,10 +1497,10 @@ def operate(id, event, qstate, qdata):
             # Determine if domain has been previously validated
             if q_name_original not in excludeSS:
                 debug('[{}]: checking Safe Search DB', q_name_original)
-                (isSafeSearch, _) = lookup(safeSearchDB, q_name_original, try_www=True, tld_limit=-1)
+                (isSafeSearch, isSafeSearch_match) = lookup(safeSearchDB, q_name_original, try_www=True, tld_limit=-1)
 
                 if isSafeSearch:
-                    debug('[{}]: domain found in Safe Search DB: {}', q_name_original, safeSearchDB)
+                    debug('[{}]: domain found in Safe Search DB (matching: {}): {}', q_name_original, isSafeSearch_match, isSafeSearch)
 
                     ss_found = False
                     if isSafeSearch['A'] == 'nxdomain':
@@ -1729,15 +1729,21 @@ def operate(id, event, qstate, qdata):
 
         debug('[{}]: got TLD: {}', q_name_original, tld)
 
-        # Determine highest priority blacklist and whitelist entries for this query
         for val_counter, q_name in enumerate(validate, start=1):
+
+            q_block_result = None   # the raw dictionary entry for this q_name
+            q_block_match = None    # the value that caused the match for this q_name (e.g. TLD, www.domain, etc.)
 
             # Determine if domain was previously blocked
             debug('[{}]: checking block cache for domain name: {}', q_name_original, q_name)
             cached_block = block_cache.get(q_name)
             if cached_block:
-                (q_block_result, q_block_match) = (cached_block, cached_block['b_eval'])
-                debug('[{}]: found domain name in block cache: {} (matching: {}): {}', q_name_original, q_name, q_block_match, q_block_result)
+                cached_block_entry = cached_block['entry']
+                if cached_block_entry:
+                    (q_block_result, q_block_match) = (cached_block_entry, cached_block_entry['b_eval'])
+                    debug('[{}]: found domain name in block cache: {} (matching: {}): {}', q_name_original, q_name, q_block_match, q_block_result)
+                else:
+                    debug('[{}]: found negative result for domain name in block cache: {}', q_name_original, q_name)
             else:
                 (q_block_result, q_block_match) = block_lookup(q_name, tld)
 
@@ -1749,16 +1755,27 @@ def operate(id, event, qstate, qdata):
                 if block_result['b_type'] == 'Python':
                     # This is the type of blocking with the highest precedence, so skip all other checks
                     break
+            elif not cached_block:
+                # If there is a future match, this is eventually replaced by the actual match
+                debug('[{}]: adding negative result to block cache: {}', q_name_original, q_name)
+                block_cache[q_name] = {'entry': None}
 
         if block_result:
             for val_counter, q_name in enumerate(validate, start=1):
+
+                q_whitelist_result = None   # the raw dictionary entry for this q_name
+                q_whitelist_match = None    # the value that caused the match for this q_name (e.g. TLD, www.domain, etc.)
 
                 # Determine if domain has been previously excluded
                 debug('[{}]: checking exclusion cache for domain name: {}', q_name_original, q_name)
                 cached_exclusion = exclusion_cache.get(q_name)
                 if cached_exclusion:
-                    (q_whitelist_result, q_whitelist_match) = cached_exclusion
-                    debug('[{}]: domain found in exclusion cache: {} (matching: {}): {}', q_name_original, q_name, q_whitelist_match, q_whitelist_result)
+                    cached_exclusion_entry = cached_exclusion['entry']
+                    if cached_exclusion_entry:
+                        (q_whitelist_result, q_whitelist_match) = cached_exclusion_entry
+                        debug('[{}]: domain found in exclusion cache: {} (matching: {}): {}', q_name_original, q_name, q_whitelist_match, q_whitelist_result)
+                    else:
+                        debug('[{}]: found negative result for domain name in exclusion cache: {}', q_name_original, q_name)
                 else:
                     (q_whitelist_result, q_whitelist_match) = whitelist_lookup(q_name, user_only=(block_result['b_type'] == 'Python'))
 
@@ -1768,13 +1785,20 @@ def operate(id, event, qstate, qdata):
                     if whitelist_result['group'] == 'USER':
                         # This is the type of exclusion with the highest precedence, so skip all other checks
                         break
+                elif not cached_exclusion:
+                    # If there is a future match, this is eventually replaced by the actual match
+                    debug('[{}]: adding negative result to exclusion cache: {}', q_name_original, q_name)
+                    exclusion_cache[q_name] = {'entry': None}
 
         # Exclusion has higher precendence than block, except for block of type Python (which means either user-defined block, regex block, etc.)
         # User-defined exclusion ("whitelist") has the highest precedence, though.
         # Whitelist > Block (Python) > Exclusion > Block
         if block_result and whitelist_result:
             if block_result['b_type'] != 'Python' or whitelist_result['group'] == 'USER':
-                debug('[{}]: exclusion has priority over block entry. Block: {} (matching: {}): {}. Exclusion: {} (matching: {}): {}.', q_name_original, block_name, block_match, block_result, whitelist_name, whitelist_match, whitelist_result)                
+                debug('[{}]: exclusion has priority over block entry. Block: {} (matching: {}): {}. Exclusion: {} (matching: {}): {}.', \
+                      q_name_original, block_name, block_match, block_result, whitelist_name, whitelist_match, whitelist_result)
+                
+                # Clear block result
                 (block_result, block_match, block_name) = (None, None, None)
 
                 if not is_cached_exclusion:
@@ -1782,14 +1806,17 @@ def operate(id, event, qstate, qdata):
                     # Cache for all validated CNAMEs
                     for q_name in validate:
 
-                        # Skip entries already present - except for the whitelisted domain itself
-                        if q_name != whitelist_name and q_name in exclusion_cache:
-                            continue
+                        # Skip positive entries already present - except for the whitelisted domain itself
+                        if q_name != whitelist_name:
+                            cached_exclusion = exclusion_cache.get(q_name)
+                            if cached_exclusion and cached_exclusion['entry']:
+                                continue
 
                         debug('[{}]: adding entry to exclusion cache: {} (matching: {}): {}', q_name_original, q_name, whitelist_match, whitelist_result)
-                        exclusion_cache[q_name] = (whitelist_result, whitelist_match)
+                        exclusion_cache[q_name] = {'entry': (whitelist_result, whitelist_match)}
             else:
-                debug('[{}]: block has priority over exclusion entry. Block: {} (matching: {}): {}. Exclusion: {} (matching: {}): {}.', q_name_original, block_name, block_match, block_result, whitelist_name, whitelist_match, whitelist_result)                
+                debug('[{}]: block has priority over exclusion entry. Block: {} (matching: {}): {}. Exclusion: {} (matching: {}): {}.', \
+                      q_name_original, block_name, block_match, block_result, whitelist_name, whitelist_match, whitelist_result)
 
         
         if block_result and not is_cached_block:
@@ -1817,19 +1844,22 @@ def operate(id, event, qstate, qdata):
                         else:
                             q = q.split('.', 1)[-1]
 
-            (b_type, log_type, key, feed, group, b_eval) = (block_result['b_type'], block_result['log'], block_result['key'], block_result['feed'], block_result['group'], block_match)
+            (b_type, log_type, key, feed, group, b_eval) = \
+                (block_result['b_type'], block_result['log'], block_result['key'], block_result['feed'], block_result['group'], block_match)
 
             # Cache for all validated CNAMEs
             for q_name in validate:
 
-                # Skip entries already present - except for the blocked domain itself
-                if q_name != block_name and q_name in block_cache:
-                    continue
+                # Skip positive entries already present - except for the blocked domain itself
+                if q_name != block_name:
+                    cached_block = block_cache.get(q_name)
+                    if cached_block and cached_block['entry']:
+                        continue
 
                 # Add domain to dict for get_details_dnsbl function
                 entry = {'q_name': q_name, 'b_type': b_type, 'p_type': p_type, 'key': key, 'log': log_type, 'feed': feed, 'group': group, 'b_eval': b_eval}
                 debug('[{}]: adding entry to block cache: {}: {}', q_name_original, q_name, entry)
-                block_cache[q_name] = entry
+                block_cache[q_name] = {'entry': entry}
 
                 # Replace block result reference with cached reference
                 if q_name == block_name:
@@ -1841,7 +1871,8 @@ def operate(id, event, qstate, qdata):
         # Use previously blocked domain details
         if block_result:
 
-            (q_name, p_type, log_type, feed, group, b_eval) = (block_result['q_name'], block_result['p_type'], block_result['log'], block_result['feed'], block_result['group'], block_result['b_eval'])
+            (q_name, p_type, log_type, feed, group, b_eval) = \
+                (block_result['q_name'], block_result['p_type'], block_result['log'], block_result['feed'], block_result['group'], block_result['b_eval'])
 
             # Determine blocked IP type (DNSBL VIP vs Null Blocking)
             if p_type.startswith('HSTS'):
@@ -1888,6 +1919,25 @@ def operate(id, event, qstate, qdata):
             qstate.return_msg.rep.security = 2
             qstate.ext_state[id] = MODULE_FINISHED
             return True
+        
+        # Cache negative block response after analysing precedence, etc.
+        # This is a workaround for caching negative block matches when caused by a positive exclusion match
+        # This works, but it is honestly horrible and we should refactor this ASAP
+        # TODO: refactor this entire chain to make caching more straightforward, maybe use lru_cache or similar strategy
+        else:
+            # Cache for all validated CNAMEs
+            for q_name in validate:
+
+                # Check existing entries
+                cached_block = block_cache.get(q_name)
+
+                # Skip positive entries already present
+                if cached_block and cached_block['entry']:
+                    continue
+                elif not cached_block:
+                    debug('[{}]: adding negative result to block cache: {}', q_name_original, q_name)
+                    block_cache[q_name] = {'entry': None}
+
 
     debug('[{}]: passed through', q_name_original)
 
