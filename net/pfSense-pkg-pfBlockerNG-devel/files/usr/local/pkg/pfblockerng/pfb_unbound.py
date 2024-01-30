@@ -1348,8 +1348,8 @@ def regex_lookup(db, name, filter=None):
 def block_lookup(q_name, tld):
     global pfb, dataDB, wildcardDataDB, zoneDB, regexDataDB, regexDB, segmentSizeDB
 
-    result = None
-    match = None
+    result = None  # the raw entry found in the queried dictionary
+    match = None   # the actual value which caused the match (e.g. the TLD, www.domain, etc.)
 
     # Determine if domain is in DNSBL 'data|zone' database
     if pfb['python_blocking']:
@@ -1416,8 +1416,8 @@ def block_lookup(q_name, tld):
 def whitelist_lookup(q_name, user_only=False):
     global pfb, whiteDB, wildcardWhiteDB, regexWhiteDB, segmentSizeDB
 
-    result = None
-    match = None
+    result = None  # the raw entry found in the queried dictionary
+    match = None   # the actual value which caused the match (e.g. the TLD, www.domain, etc.)
     filter = None
 
     if user_only:
@@ -1714,13 +1714,13 @@ def operate(id, event, qstate, qdata):
 
         isCNAME = False
 
-        block_result = None
-        block_match = None
-        block_name = None
+        block_result = None         # the raw dictionary entry
+        block_match = None          # the value that caused the match (e.g. TLD, www.domain, etc.)
+        block_name = None           # the q_name that caused the match
 
-        whitelist_result = None
-        whitelist_match = None
-        whitelist_name = None
+        whitelist_result = None     # the raw dictionary entry
+        whitelist_match = None      # the value that caused the match (e.g. TLD, www.domain, etc.)
+        whitelist_name = None       # the q_name that caused the match
 
         is_cached_block = False
         is_cached_exclusion = False
@@ -1732,21 +1732,18 @@ def operate(id, event, qstate, qdata):
         # Determine highest priority blacklist and whitelist entries for this query
         for val_counter, q_name in enumerate(validate, start=1):
 
-            q_is_cached_block = False
-
             # Determine if domain was previously blocked
             debug('[{}]: checking block cache for domain name: {}', q_name_original, q_name)
             cached_block = block_cache.get(q_name)
             if cached_block:
                 (q_block_result, q_block_match) = (cached_block, cached_block['b_eval'])
                 debug('[{}]: found domain name in block cache: {} (matching: {}): {}', q_name_original, q_name, q_block_match, q_block_result)
-                q_is_cached_block = True
             else:
                 (q_block_result, q_block_match) = block_lookup(q_name, tld)
 
             if q_block_result:
                 debug('[{}]: domain blocked: {} (matching: {}): {}', q_name_original, q_name, q_block_match, q_block_result)
-                (block_result, block_match, block_name, is_cached_block) = (q_block_result, q_block_match, q_name, q_is_cached_block)
+                (block_result, block_match, block_name, is_cached_block) = (q_block_result, q_block_match, q_name, cached_block is not None)
                 if val_counter > 1:
                     isCNAME = True
                 if block_result['b_type'] == 'Python':
@@ -1756,21 +1753,18 @@ def operate(id, event, qstate, qdata):
         if block_result:
             for val_counter, q_name in enumerate(validate, start=1):
 
-                q_is_cached_exclusion = False
-
                 # Determine if domain has been previously excluded
                 debug('[{}]: checking exclusion cache for domain name: {}', q_name_original, q_name)
                 cached_exclusion = exclusion_cache.get(q_name)
                 if cached_exclusion:
                     (q_whitelist_result, q_whitelist_match) = cached_exclusion
                     debug('[{}]: domain found in exclusion cache: {} (matching: {}): {}', q_name_original, q_name, q_whitelist_match, q_whitelist_result)
-                    q_is_cached_exclusion = True
                 else:
                     (q_whitelist_result, q_whitelist_match) = whitelist_lookup(q_name, user_only=(block_result['b_type'] == 'Python'))
 
                 if q_whitelist_result:
                     debug('[{}]: domain excluded: {} (matching: {}): {}', q_name_original, q_name, q_whitelist_match, q_whitelist_result)
-                    (whitelist_result, whitelist_match, whitelist_name, is_cached_exclusion) = (q_whitelist_result, q_whitelist_match, q_name, q_is_cached_exclusion)
+                    (whitelist_result, whitelist_match, whitelist_name, is_cached_exclusion) = (q_whitelist_result, q_whitelist_match, q_name, cached_exclusion is not None)
                     if whitelist_result['group'] == 'USER':
                         # This is the type of exclusion with the highest precedence, so skip all other checks
                         break
