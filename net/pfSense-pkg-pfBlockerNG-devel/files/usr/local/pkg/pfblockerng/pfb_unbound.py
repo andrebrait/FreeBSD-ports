@@ -1470,11 +1470,11 @@ def operate(id, event, qstate, qdata):
         if qstate_valid and q_type == RR_TYPE_AAAA and noAAAADB and q_name_original not in excludeAAAADB:
 
             debug('[{}]: checking no-AAAA DB', q_name_original)
-            (isnoAAAA, isnoAAA_match) = lookup(noAAAADB, q_name_original)
+            (isnoAAAA, isnoAAAA_match) = lookup(noAAAADB, q_name_original)
 
             # Create FQDN Reply Message (AAAA -> A)
             if isnoAAAA:
-                debug('[{}]: domain found in no-AAAA DB (matching: {}). Creating FQDN Reply Message (AAAA -> A)', q_name_original, isnoAAA_match)
+                debug('[{}]: domain found in no-AAAA DB (matching: {}). Creating FQDN Reply Message (AAAA -> A)', q_name_original, isnoAAAA_match)
                 msg = DNSMessage(qstate.qinfo.qname_str, RR_TYPE_A, RR_CLASS_IN, PKT_QR | PKT_RA)
                 if msg is None or not msg.set_return_msg(qstate):
                     qstate.ext_state[id] = MODULE_ERROR
