@@ -8418,7 +8418,7 @@ function sync_package_pfblockerng($cron='') {
 												$easylist = $validated_header = TRUE;
 												break;
 											}
-											// Skip exclamation comment lines until finding the header
+											// Skip exclamation comment lines and other headers
 											// Needs to be done separately because of AdGuard
 											elseif (substr($line, 0, 1) === '!' ||
 													substr($line, 0, 1) === '[') {
@@ -8504,7 +8504,7 @@ function sync_package_pfblockerng($cron='') {
 												continue;
 											}
 
-											// Skip exclamations and headers comment lines
+											// Skip exclamations comment lines and headers
 											if (substr($line, 0, 1) === '!' ||
 												substr($line, 0, 1) === '[') {
 												continue;
