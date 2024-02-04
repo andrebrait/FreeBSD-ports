@@ -8394,12 +8394,90 @@ function sync_package_pfblockerng($cron='') {
 								$e_replace = array( '||', '.^', '^' );
 
 								// Variables for parsing Easylist-style lists
-								$easylist = FALSE;
+								$easylist = $validated_header = FALSE;
 								$exclusion_data = '';
 
 								$run_once = $csv_parser = FALSE;
 								$csv_type = '';
 								$ipcount = $ip_cnt = 0;
+
+								$lite = FALSE;
+
+								// First check if this is an EasyList
+								if (($fhandle = @fopen("{$file_dwn}.orig", 'r')) !== FALSE) {
+									while (($line = @fgets($fhandle)) !== FALSE) {
+
+										$line = trim($line);
+
+										// Validate EasyList/AdBlock/uBlock/ADGuard Feeds
+										if (!$validated_header) {
+											if (strpos($line, '[Adblock Plus ') !== FALSE ||
+												strpos($line, '[Adblock Plus]') !== FALSE ||
+												strpos($line, '[uBlock Origin') !== FALSE ||
+												strpos($line, '! Title: AdGuard') !== FALSE) {
+												$easylist = $validated_header = TRUE;
+												break;
+											}
+											// Skip exclamation comment lines until finding the header
+											// Needs to be done separately because of AdGuard
+											elseif (substr($line, 0, 1) === '!' ||
+													substr($line, 0, 1) === '[') {
+												continue;
+											}
+											// Some real content found, so stop checking for the header
+											else {
+												$validated_header = TRUE;
+											}
+										}
+
+										// Skip exclamation comment lines and headers
+										if (substr($line, 0, 1) === '!' ||
+											substr($line, 0, 1) === '[') {
+											continue;
+										}
+
+										// Checks for EasyLists without headers
+										if (substr($line, 0, 2) === '||' ||
+											substr($line, 0, 4) === '@@||') {
+											$easylist = TRUE;
+											break;
+										}
+
+										// Probably EasyList-style domain
+										if (substr($line, 0, 1) === '|' || 
+											substr($line, 0, 1) === '@') {
+
+											// EasyLists are the only syntax that accepts ^
+											if (strpos($line, '^') !== FALSE) {
+												$easylist = TRUE;
+												break;
+											}
+
+											// EasyList exclusion
+											if (substr($line, 0, 2) === '@@') {
+												$easylist = TRUE;
+												break;
+											}
+
+											// Remove all pipes
+											$line = trim($line, '|');
+											$line = trim(str_replace($e_replace, '',  $line));
+
+											// Skip empty lines
+											if (empty($line)) {
+												continue;
+											}
+
+											// This is very likely an EasyList
+											$easylist = TRUE;
+											$lite = TRUE;
+											break;
+										}
+									}
+								}
+								if ($fhandle) {
+									@fclose($fhandle);
+								}
 
 								// Parse downloaded file for Domain names
 								if (($fhandle = @fopen("{$file_dwn}.orig", 'r')) !== FALSE) {
@@ -8411,25 +8489,47 @@ function sync_package_pfblockerng($cron='') {
 											// Collect original line
 											$oline = $line;
 
-											// Remove exclamation comment lines
-											if (substr($line, 0, 1) === '!') {
-												continue;
-											}
-
 											// Remove any '^M' characters
 											if (strpos($line, "\r") !== FALSE) {
 												$line = rtrim($line, "\x00..\x1F");
 											}
-
+										
 											// Remove invalid charaters
 											$line = trim($line, " \t\n\r\0\x0B\xC2\xA0");
+										
+											// Trim all whitespace characters
+											$line = trim($line);
+										
+											if (empty($line)) {
+												continue;
+											}
+
+											// Skip exclamations and headers comment lines
+											if (substr($line, 0, 1) === '!' ||
+												substr($line, 0, 1) === '[') {
+												continue;
+											}
 
 											// Make it case-insensitive
 											$line = strtolower($line);
 
-											// Probably Easylist-style domain whitelist
-											if (substr($line, 0, 1) === '|' ||
-												substr($line, 0, 1) === '@') {
+											// Check for EasyList-style domain blocks and exclusions
+											if ($easylist) {
+
+												// Invalid for either blocking or excluding -- skip it
+												if (strpos($line, '$') !== FALSE ||
+													strpos($line, '/') !== FALSE ||
+													strpos($line, '?') !== FALSE ||
+													strpos($line, '~') !== FALSE ||
+													strpos($line, '=') !== FALSE ||
+													strpos($line, '&') !== FALSE ||
+													strpos($line, ';') !== FALSE ||
+													strpos($line, '#') !== FALSE ||
+													strpos($line, ',') !== FALSE ||
+													strpos($line, ':') !== FALSE) {
+													continue;
+												}
+
 												$startpos = 0;
 												$endpos = -1;
 												$is_easylist_exclusion = FALSE;
@@ -8437,13 +8537,13 @@ function sync_package_pfblockerng($cron='') {
 
 												// Exclusion
 												if (substr($line, 0, 2) === '@@') {
+													// Skip for Unbound mode -- not compatible with exclusions
+													if(!$pfb['dnsbl_py_blacklist']) {
+														continue;
+													}
+
 													$startpos = 2;
 													$is_easylist_exclusion = TRUE;
-												}
-
-												// Skip for Unbound mode -- not compatible with exclusions
-												if (!$pfb['dnsbl_py_blacklist'] && $is_easylist_exclusion){
-													continue;
 												}
 
 												// Not sure if within spec, but some domains might end with a pipe
@@ -8456,25 +8556,25 @@ function sync_package_pfblockerng($cron='') {
 													substr($line, $endpos, 1) !== '^') {
 													continue;
 												}
-												
-												// Not valid for either black or whitelisting
-												if (strpos($line, '$') !== FALSE ||
-													strpos($line, '/') !== FALSE) {
-													continue;
-												}
 
-												$line = str_replace($e_replace, '',  substr($line, $startpos, $endpos));
+												$line = trim(str_replace($e_replace, '',  substr($line, $startpos, $endpos)));
 
 												// Skip empty lines
 												if (empty($line)) {
 													continue;
 												}
 
-												$is_regex = strpos($line, '*') !== FALSE;
+												// Only lite parsing required
+												$lite = TRUE;
 
-												// Not a valid domain name entry for blacklisting in Unbound mode -- skip it!
-												if (!$pfb['dnsbl_py_blacklist'] && $is_regex) {
-													continue;
+												// Regex
+												if (strpos($line, '*') !== FALSE) {
+													// Skip for Unbound mode -- not compatible with regular expressions
+													if (!$pfb['dnsbl_py_blacklist']) {
+														continue;
+													}
+
+													$is_regex = TRUE;
 												}
 
 												// Convert IDN (Unicode domains) to ASCII (punycode)
@@ -8531,9 +8631,6 @@ function sync_package_pfblockerng($cron='') {
 													@fwrite($dhandle, $domain_data);
 													continue;
 												}
-
-												$lite    = TRUE;
-												$easylist = TRUE;
 											}
 											else {
 												// If 'tab' character found, replace with whitespace
@@ -8712,7 +8809,12 @@ function sync_package_pfblockerng($cron='') {
 													continue;
 												}
 											}
+
 											$line = trim($line);
+
+											if (empty($line)) {
+												continue;
+											}
 
 											if (!$easylist) {
 
@@ -8777,7 +8879,12 @@ function sync_package_pfblockerng($cron='') {
 													$line = preg_replace("/:[0-9]{1,5}$/", '', $line);
 												}
 											}
+
 											$line = trim($line);
+
+											if (empty($line)) {
+												continue;
+											}
 
 											// Collect any IPs found in domain feed
 											if (is_ipaddrv4($line)) {
@@ -8792,10 +8899,6 @@ function sync_package_pfblockerng($cron='') {
 												continue;
 											}
 
-											if (empty($line)) {
-												continue;
-											}
-
 											// Convert IDN (Unicode domains) to ASCII (punycode)
 											$line = convert_idn($line);
 											if (empty($line)) {
@@ -8806,6 +8909,10 @@ function sync_package_pfblockerng($cron='') {
 
 											// Remove leading/trailing dots
 											$line = trim(trim($line), '.');
+
+											if (empty($line)) {
+												continue;
+											}
 
 											// Domain Validation
 											if (empty(pfb_filter($line, PFB_FILTER_DOMAIN, 'DNSBL_Download'))) {
