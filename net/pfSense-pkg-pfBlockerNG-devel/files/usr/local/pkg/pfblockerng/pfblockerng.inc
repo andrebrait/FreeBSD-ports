@@ -8394,17 +8394,18 @@ function sync_package_pfblockerng($cron='') {
 								$e_replace = array( '||', '.^', '^' );
 
 								// Variables for parsing Easylist-style lists
-								$easylist = $validated_header = FALSE;
-								$exclusion_data = '';
+								$easylist = FALSE;
 
 								$run_once = $csv_parser = FALSE;
 								$csv_type = '';
 								$ipcount = $ip_cnt = 0;
 
-								$lite = FALSE;
-
 								// First check if this is an EasyList
 								if (($fhandle = @fopen("{$file_dwn}.orig", 'r')) !== FALSE) {
+
+									// Variables for checking whether it's an Easylist-style list
+									$validated_header = FALSE;
+
 									while (($line = @fgets($fhandle)) !== FALSE) {
 
 										$line = trim($line);
@@ -8470,7 +8471,6 @@ function sync_package_pfblockerng($cron='') {
 
 											// This is very likely an EasyList
 											$easylist = TRUE;
-											$lite = TRUE;
 											break;
 										}
 									}
@@ -8563,9 +8563,6 @@ function sync_package_pfblockerng($cron='') {
 												if (empty($line)) {
 													continue;
 												}
-
-												// Only lite parsing required
-												$lite = TRUE;
 
 												// Regex
 												if (strpos($line, '*') !== FALSE) {
@@ -8816,7 +8813,12 @@ function sync_package_pfblockerng($cron='') {
 												continue;
 											}
 
-											if (!$easylist) {
+											if ($easylist) {
+
+												// Only lite parsing required for EasyLists
+												$lite = TRUE;
+											}
+											else {
 
 												// Typical Host Feed format - Remove characters before space
 												if (!$rev_format && strpos($line, ' ') !== FALSE) {
@@ -8878,12 +8880,12 @@ function sync_package_pfblockerng($cron='') {
 												if (strpos($line, ':') !== FALSE) {
 													$line = preg_replace("/:[0-9]{1,5}$/", '', $line);
 												}
-											}
 
-											$line = trim($line);
+												$line = trim($line);
 
-											if (empty($line)) {
-												continue;
+												if (empty($line)) {
+													continue;
+												}
 											}
 
 											// Collect any IPs found in domain feed
