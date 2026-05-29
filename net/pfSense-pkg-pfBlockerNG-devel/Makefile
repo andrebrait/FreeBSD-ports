@@ -22,6 +22,8 @@ RUN_DEPENDS=	${LOCALBASE}/bin/mmdblookup:net/libmaxminddb \
 
 USES=		php python
 
+TEST_DEPENDS=	${PYTHON_PKGNAMEPREFIX}pytest>=0:devel/py-pytest@${PY_FLAVOR}
+
 CONFLICTS=	pfSense-pkg-pfBlockerNG
 
 USE_PHP=	intl
@@ -33,6 +35,14 @@ SUB_LIST=	PORTNAME=${PORTNAME}
 
 do-extract:
 	${MKDIR} ${WRKSRC}
+
+do-test:
+	${MKDIR} ${WRKSRC}${PREFIX}/pkg/pfblockerng
+	${CP} ${FILESDIR}${PREFIX}/pkg/pfblockerng/pfb_unbound.py \
+		${WRKSRC}${PREFIX}/pkg/pfblockerng/
+	${CP} -r ${FILESDIR}/tests ${WRKSRC}/
+	cd ${WRKSRC} && ${SETENV} ${TEST_ENV} \
+		${PYTHON_CMD} -m pytest -v tests/
 
 do-install:
 	${MKDIR} ${STAGEDIR}/etc/inc/priv
