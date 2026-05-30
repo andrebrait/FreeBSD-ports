@@ -32,11 +32,15 @@ GH_PROJECT=	pfBlockerNG
 GH_TAGNAME=	v${PORTVERSION}
 DIST_SUBDIR=	${PORTNAME}
 
-# GitHub extracts to <project>-<version>/ (stripping the leading 'v')
-WRKSRC=		${WRKDIR}/${GH_PROJECT}-${PORTVERSION}
+# GitHub extracts to <project>-<version>/; production files live under src/
+WRKSRC=		${WRKDIR}/${GH_PROJECT}-${PORTVERSION}/src
 
 SUB_FILES=	pkg-install pkg-deinstall
 SUB_LIST=	PORTNAME=${PORTNAME}
+
+post-extract:
+	@${SED} -i '' 's|%%PKGNAME%%|${PORTNAME}|g' \
+		${WRKSRC}/usr/local/share/pfSense-pkg-pfBlockerNG/info.xml
 
 do-install:
 	${MKDIR} ${STAGEDIR}/etc/inc/priv

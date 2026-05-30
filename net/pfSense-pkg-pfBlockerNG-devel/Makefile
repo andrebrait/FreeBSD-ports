@@ -39,6 +39,10 @@ TEST_DEPENDS=	${PYTHON_PKGNAMEPREFIX}pytest>=0:devel/py-pytest@${PY_FLAVOR}
 SUB_FILES=	pkg-install pkg-deinstall
 SUB_LIST=	PORTNAME=${PORTNAME}
 
+post-extract:
+	@${SED} -i '' 's|%%PKGNAME%%|${PORTNAME}|g' \
+		${WRKSRC}/usr/local/share/pfSense-pkg-pfBlockerNG/info.xml
+
 do-install:
 	${MKDIR} ${STAGEDIR}/etc/inc/priv
 	${MKDIR} ${STAGEDIR}${PREFIX}/pkg/pfblockerng
