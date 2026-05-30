@@ -42,6 +42,8 @@ SUB_LIST=	PORTNAME=${PORTNAME}
 post-extract:
 	@${SED} -i '' 's|%%PKGNAME%%|${PORTNAME}|g' \
 		${WRKSRC}/usr/local/share/pfSense-pkg-pfBlockerNG/info.xml
+	@mv ${WRKSRC}/usr/local/share/pfSense-pkg-pfBlockerNG \
+		${WRKSRC}/usr/local/share/${PORTNAME}
 
 do-install:
 	${MKDIR} ${STAGEDIR}/etc/inc/priv
