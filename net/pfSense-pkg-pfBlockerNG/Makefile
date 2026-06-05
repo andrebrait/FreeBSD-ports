@@ -45,6 +45,7 @@ post-extract:
 do-install:
 	${MKDIR} ${STAGEDIR}/etc/inc/priv
 	${MKDIR} ${STAGEDIR}${PREFIX}/pkg/pfblockerng
+	${MKDIR} ${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
 	${MKDIR} ${STAGEDIR}${PREFIX}/www/pfblockerng/www
 	${MKDIR} ${STAGEDIR}${PREFIX}/www/widgets/widgets
 	${MKDIR} ${STAGEDIR}${PREFIX}/www/widgets/include
@@ -62,56 +63,58 @@ do-install:
 		${STAGEDIR}${PREFIX}/pkg/pfblockerng
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/pkg/pfblockerng/pfblockerng_extra.inc \
 		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_AF.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_ALL_REGIONS.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_AP.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_AP_EAST.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_AP_NORTHEAST.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_AP_SOUTH.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_AP_SOUTHEAST.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_CA.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_CN.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_CN_NORTH.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_CN_NORTHWEST.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_EU.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_EU_CENTRAL.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_EU_NORTH.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_EU_SOUTH.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_EU_WEST.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_IL.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_ME.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_ME_CENTRAL.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_ME_SOUTH.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_SA.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_US.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_US_EAST.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_US_GOV.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_US_WEST.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/aws_region_prefixes.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_AF.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_ALL_REGIONS.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_AP.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_AP_EAST.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_AP_NORTHEAST.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_AP_SOUTH.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_AP_SOUTHEAST.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_CA.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_CN.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_CN_NORTH.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_CN_NORTHWEST.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_EU.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_EU_CENTRAL.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_EU_NORTH.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_EU_SOUTH.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_EU_WEST.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_IL.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_ME.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_ME_CENTRAL.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_ME_SOUTH.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_SA.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_US.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_US_EAST.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_US_GOV.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_US_WEST.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/www/pfblockerng/pfBlockerNG.js \
 		${STAGEDIR}${PREFIX}/www/pfblockerng
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/www/pfblockerng/pfblockerng_asn.txt \
