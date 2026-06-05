@@ -50,6 +50,7 @@ www/pfblockerng/pfblockerng_dnsbl.php
 www/pfblockerng/pfblockerng_feeds.json
 www/pfblockerng/pfblockerng_feeds.php
 www/pfblockerng/pfblockerng_general.php
+www/pfblockerng/pfblockerng_hooks.php
 www/pfblockerng/pfblockerng_ip.php
 www/pfblockerng/pfblockerng_log.php
 www/pfblockerng/pfblockerng_safesearch.php
