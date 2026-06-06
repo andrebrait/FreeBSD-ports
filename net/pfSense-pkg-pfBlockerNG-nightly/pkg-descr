@@ -1,0 +1,11 @@
+pfBlockerNG-nightly is the bleeding-edge nightly build of pfBlockerNG,<br />
+built from the development tip. It conflicts with the stable and -devel<br />
+packages; switch back via the release channel.<br />
+Manage IPv4/v6 List Sources into 'Deny, Permit or Match' formats.<br />
+GeoIP database by MaxMind Inc. (GeoLite2 Free version).<br />
+De-Duplication, Suppression, and Reputation enhancements.<br />
+Provision to download from diverse List formats.<br />
+Advanced Integration for Proofpoint ET IQRisk IP Reputation Threat Sources.<br />
+Domain Name (DNSBL) blocking via Unbound DNS Resolver.
+
+WWW: https://docs.netgate.com/pfsense/en/latest/packages/pfblocker.html 
