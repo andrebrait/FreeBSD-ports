@@ -39,8 +39,11 @@ TEST_DEPENDS=	${PYTHON_PKGNAMEPREFIX}pytest>=0:devel/py-pytest@${PY_FLAVOR}
 SUB_FILES=	pkg-install pkg-deinstall
 SUB_LIST=	PORTNAME=${PORTNAME}
 
+# The info.xml <name> is the pfSense package-REGISTRATION name, which rc.packages
+# (install_package_xml -> get_package_id) looks up by the pfSense-pkg- PREFIX-STRIPPED
+# name. So it MUST be the short name (pfBlockerNG-devel), NOT the full ${PORTNAME}.
 post-extract:
-	@${SED} -i '' 's|%%PKGNAME%%|${PORTNAME}|g' \
+	@${SED} -i '' 's|%%PKGNAME%%|${PORTNAME:S/pfSense-pkg-//}|g' \
 		${WRKSRC}/usr/local/share/pfSense-pkg-pfBlockerNG/info.xml
 	@mv ${WRKSRC}/usr/local/share/pfSense-pkg-pfBlockerNG \
 		${WRKSRC}/usr/local/share/${PORTNAME}
