@@ -54,6 +54,7 @@ www/pfblockerng/pfblockerng_general.php
 www/pfblockerng/pfblockerng_ip.php
 www/pfblockerng/pfblockerng_log.php
 www/pfblockerng/pfblockerng_safesearch.php
+www/pfblockerng/pfblockerng_software.php
 www/pfblockerng/pfblockerng_sync.php
 www/pfblockerng/pfblockerng_threats.php
 www/pfblockerng/pfblockerng_update.php
