@@ -17,3 +17,9 @@ hook carries this into sessions working the ports branches (where this file is
 absent by design). The pfBlockerNG-package mechanics and language/runtime
 specifics do **not** apply. **Any rule below overrides the inherited default for
 this repo.**
+
+## Commit attribution and signing
+
+Inherited — see `pfBlockerNG/pfBlockerNG`'s `## Commit style` → **Author, committer, and signing**
+(the source of truth). Not restated here, to avoid drift. Applies to meta/agent commits on this
+`claude-meta` ref (it must never reach a ports branch).
