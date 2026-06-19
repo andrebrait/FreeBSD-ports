@@ -50,6 +50,7 @@ post-extract:
 
 do-install:
 	${MKDIR} ${STAGEDIR}/etc/inc/priv
+	${MKDIR} ${STAGEDIR}${PREFIX}/pkg/firewall_aliases_edit/pre_write_config
 	${MKDIR} ${STAGEDIR}${PREFIX}/pkg/pfblockerng
 	${MKDIR} ${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
 	${MKDIR} ${STAGEDIR}${PREFIX}/www/pfblockerng/www
@@ -69,6 +70,8 @@ do-install:
 		${STAGEDIR}${PREFIX}/pkg/pfblockerng
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/pkg/pfblockerng/pfblockerng_extra.inc \
 		${STAGEDIR}${PREFIX}/pkg/pfblockerng
+	${INSTALL_DATA} ${WRKSRC}${PREFIX}/pkg/firewall_aliases_edit/pre_write_config/pfblockerng.php \
+		${STAGEDIR}${PREFIX}/pkg/firewall_aliases_edit/pre_write_config
 	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/aws_region_prefixes.sh \
 		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
 	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/ip_pre_AWS_AF.sh \

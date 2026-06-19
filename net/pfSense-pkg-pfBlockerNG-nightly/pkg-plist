@@ -1,4 +1,5 @@
 /etc/inc/priv/pfblockerng.priv.inc
+pkg/firewall_aliases_edit/pre_write_config/pfblockerng.php
 pkg/pfblockerng.xml
 pkg/pfblockerng/dnsbl_tld
 pkg/pfblockerng/pfb_dnsbl.doh.conf
