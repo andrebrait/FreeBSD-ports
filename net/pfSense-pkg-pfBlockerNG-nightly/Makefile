@@ -1,5 +1,5 @@
 PORTNAME=	pfSense-pkg-pfBlockerNG-nightly
-PORTVERSION=	3.2.16
+PORTVERSION=	4.0.0.alpha.2
 CATEGORIES=	net
 
 MAINTAINER=	coreteam@pfsense.org
@@ -26,7 +26,7 @@ NO_BUILD=	yes
 NO_MTREE=	yes
 
 USE_GITHUB=	yes
-GH_ACCOUNT=	andrebrait
+GH_ACCOUNT=	pfBlockerNG
 GH_PROJECT=	pfBlockerNG
 GH_TAGNAME=	v${PORTVERSION}
 DIST_SUBDIR=	${PORTNAME}
