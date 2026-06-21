@@ -28,7 +28,7 @@ NO_MTREE=	yes
 USE_GITHUB=	yes
 GH_ACCOUNT=	pfBlockerNG
 GH_PROJECT=	pfBlockerNG
-GH_TAGNAME=	v4.0.0.alpha.3
+GH_TAGNAME=	v${PORTVERSION}
 DIST_SUBDIR=	${PORTNAME}
 
 # GitHub extracts to <project>-<version>/; production files live under src/
