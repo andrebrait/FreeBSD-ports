@@ -1,5 +1,5 @@
 PORTNAME=	pfSense-pkg-pfBlockerNG-devel
-PORTVERSION=	4.0.0.alpha.2
+PORTVERSION=	4.0.0.alpha.3
 CATEGORIES=	net
 
 MAINTAINER=	coreteam@pfsense.org
@@ -28,7 +28,7 @@ NO_MTREE=	yes
 USE_GITHUB=	yes
 GH_ACCOUNT=	pfBlockerNG
 GH_PROJECT=	pfBlockerNG
-GH_TAGNAME=	v${PORTVERSION}
+GH_TAGNAME=	v4.0.0.alpha.3
 DIST_SUBDIR=	${PORTNAME}
 
 # GitHub extracts to <project>-<version>/; production files live under src/
