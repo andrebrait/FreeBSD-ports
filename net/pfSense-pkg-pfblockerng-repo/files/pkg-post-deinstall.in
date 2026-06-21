@@ -1,0 +1,17 @@
+#!/bin/sh
+# pkg-post-deinstall — remove the pfBlockerNG repo conf on deinstall.
+# ADR-39: removes only the conf this meta-package owns.
+#
+# Guarded on $2 == POST-DEINSTALL per pfSense pkg-deinstall convention.
+# POSIX sh only; base system only; no PHP; no add-on deps — runs under libpkg.
+
+if [ "${2}" != "POST-DEINSTALL" ]; then
+	exit 0
+fi
+
+_conf_path="/usr/local/etc/pkg/repos/pfblockerng.conf"
+
+if [ -f "${_conf_path}" ]; then
+	rm -f "${_conf_path}"
+	echo "==> pfblockerng-repo: removed ${_conf_path}"
+fi

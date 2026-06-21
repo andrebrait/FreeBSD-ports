@@ -1,0 +1,46 @@
+#!/bin/sh
+# pkg-post-install — write the pfBlockerNG self-hosted pkg repo conf after install.
+# ADR-39: on-box detection replaces the Cloudflare Worker routing (ADR-20 retired).
+#
+# Guarded on $2 == POST-INSTALL per pfSense pkg-install convention.
+# POSIX sh only; base system only; no PHP; no add-on deps — runs under libpkg.
+# Idempotent: re-running rewrites the conf with identical content.
+
+if [ "${2}" != "POST-INSTALL" ]; then
+	exit 0
+fi
+
+# Source the installed detection helper.
+# %%DETECT_HELPER%% is substituted by build-pkg-portable.py (SUB_LIST).
+# shellcheck source=/dev/null
+. "%%DETECT_HELPER%%"
+
+# Detect the catalog subtree for this box: "<varver>/<arch>" e.g. "ce-2.8/amd64".
+_catalog="$(pfb_detect_catalog)"
+
+# Write the resolved repo conf.
+# URL: direct GitHub Pages path — no Worker, no ${ABI} variable.
+# Field set and format are byte-identical to add-repo.sh --print-conf (release channel).
+_conf_dir="/usr/local/etc/pkg/repos"
+_conf_path="${_conf_dir}/pfblockerng.conf"
+
+mkdir -p "${_conf_dir}"
+
+# Rewrite unconditionally => idempotent.
+cat > "${_conf_path}" <<EOF
+# pfBlockerNG (release channel) — self-hosted pkg repository (ADR-17).
+# NONE-signed: trust anchor is HTTPS to the host (no signing key). The catalog
+# path is fully resolved on install/upgrade (on-box detection; ADR-39).
+# priority 100 sits above the base Netgate \`pfSense\` repo so cross-repo
+# resolution (pkg install/upgrade, GUI Install) selects our build.
+pfblockerng: {
+  url: "https://pfblockerng.github.io/pkg/release/${_catalog}",
+  mirror_type: none,
+  signature_type: none,
+  priority: 100,
+  enabled: yes
+}
+EOF
+
+echo "==> pfblockerng-repo: wrote ${_conf_path} (release/${_catalog})"
+/usr/local/sbin/pkg update -q || true
