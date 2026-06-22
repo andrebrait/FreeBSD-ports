@@ -10,6 +10,7 @@ pkg/pfblockerng/pfblockerng.inc
 pkg/pfblockerng/pfblockerng.sh
 pkg/pfblockerng/pfblockerng_extra.inc
 pkg/pfblockerng/pfblockerng_fwobj.inc
+pkg/pfblockerng/pfblockerng_dns_redirect.inc
 pkg/pfblockerng/pfblockerng_install.inc
 pkg/pfblockerng/shallalist_global_usage
 pkg/pfblockerng/ut1_global_usage
