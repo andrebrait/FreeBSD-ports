@@ -59,6 +59,7 @@ www/pfblockerng/pfblockerng_threats.php
 www/pfblockerng/pfblockerng_update.php
 www/pfblockerng/www/dnsbl_default.php
 www/pfblockerng/www/index.php
+www/shortcuts/pkg_pfblockerng.inc
 www/widgets/include/widget-pfblockerng.inc
 www/widgets/javascript/pfblockerng.js
 www/widgets/widgets/pfblockerng.widget.php
