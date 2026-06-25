@@ -1,5 +1,5 @@
 PORTNAME=	pfSense-pkg-pfBlockerNG-devel
-PORTVERSION=	4.0.0.alpha.3
+PORTVERSION=	4.0.0.alpha.4
 CATEGORIES=	net
 
 MAINTAINER=	coreteam@pfsense.org
