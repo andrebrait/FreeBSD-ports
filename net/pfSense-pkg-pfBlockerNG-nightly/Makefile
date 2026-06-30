@@ -1,5 +1,5 @@
 PORTNAME=	pfSense-pkg-pfBlockerNG-nightly
-PORTVERSION=	4.0.0.alpha.7
+PORTVERSION=	4.0.0.alpha.8
 CATEGORIES=	net
 
 MAINTAINER=	coreteam@pfsense.org
