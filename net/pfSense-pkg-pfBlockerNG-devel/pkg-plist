@@ -7,6 +7,7 @@ pkg/pfblockerng/pfb_dnsbl.safesearch.conf
 pkg/pfblockerng/pfb_dnsbl.youtube_restrict.conf
 pkg/pfblockerng/pfb_dnsbl.youtube_restrictmoderate.conf
 pkg/pfblockerng/pfblockerng.inc
+pkg/pfblockerng/pfblockerng_apply.inc
 pkg/pfblockerng/pfblockerng.sh
 pkg/pfblockerng/pfblockerng_extra.inc
 pkg/pfblockerng/pfblockerng_install.inc
