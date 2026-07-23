@@ -38,7 +38,7 @@ TEST_DEPENDS=	${PYTHON_PKGNAMEPREFIX}pytest>=0:devel/py-pytest@${PY_FLAVOR}
 
 SUB_FILES=	pkg-install pkg-deinstall
 SUB_LIST=	PORTNAME=${PORTNAME}
-PLIST_DIRS=	/var/unbound
+PLIST_DIRS=	/var/unbound /etc/inc/priv /etc/inc
 
 # The info.xml <name> is the pfSense package-REGISTRATION name, which rc.packages
 # (install_package_xml -> get_package_id) looks up by the pfSense-pkg- PREFIX-STRIPPED
@@ -50,8 +50,7 @@ post-extract:
 		${WRKSRC}/usr/local/share/${PORTNAME}
 
 do-install:
-	(cd ${WRKSRC} && ${COPYTREE_SHARE} . ${STAGEDIR} \
-		"! -name .DS_Store ! -name *.pyc ! -path */__pycache__/*")
+	(cd ${WRKSRC} && ${COPYTREE_SHARE} . ${STAGEDIR})
 	${MKDIR} ${STAGEDIR}/etc/inc/priv
 	${MKDIR} ${STAGEDIR}${PREFIX}/pkg/firewall_aliases_edit/pre_write_config
 	${MKDIR} ${STAGEDIR}${PREFIX}/pkg/pfblockerng
