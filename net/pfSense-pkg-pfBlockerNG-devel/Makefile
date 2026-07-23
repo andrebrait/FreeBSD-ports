@@ -38,6 +38,7 @@ TEST_DEPENDS=	${PYTHON_PKGNAMEPREFIX}pytest>=0:devel/py-pytest@${PY_FLAVOR}
 
 SUB_FILES=	pkg-install pkg-deinstall
 SUB_LIST=	PORTNAME=${PORTNAME}
+PLIST_DIRS=	/var/unbound
 
 # The info.xml <name> is the pfSense package-REGISTRATION name, which rc.packages
 # (install_package_xml -> get_package_id) looks up by the pfSense-pkg- PREFIX-STRIPPED
@@ -49,6 +50,8 @@ post-extract:
 		${WRKSRC}/usr/local/share/${PORTNAME}
 
 do-install:
+	(cd ${WRKSRC} && ${COPYTREE_SHARE} . ${STAGEDIR} \
+		"! -name .DS_Store ! -name *.pyc ! -path */__pycache__/*")
 	${MKDIR} ${STAGEDIR}/etc/inc/priv
 	${MKDIR} ${STAGEDIR}${PREFIX}/pkg/firewall_aliases_edit/pre_write_config
 	${MKDIR} ${STAGEDIR}${PREFIX}/pkg/pfblockerng
@@ -61,6 +64,16 @@ do-install:
 	${MKDIR} ${STAGEDIR}${PREFIX}/www/shortcuts
 	${MKDIR} ${STAGEDIR}/var/unbound
 	${MKDIR} ${STAGEDIR}${DATADIR}
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/*.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/*.py \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/*.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/pfb_unbound_include.inc \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/www/pfblockerng/www/*.php \
+		${STAGEDIR}${PREFIX}/www/pfblockerng/www
 	${INSTALL_DATA} -m 0644 ${WRKSRC}${PREFIX}/pkg/pfblockerng.xml \
 		${STAGEDIR}${PREFIX}/pkg
 	${INSTALL_DATA} ${WRKSRC}/etc/inc/priv/pfblockerng.priv.inc \
@@ -211,6 +224,12 @@ do-install:
 		${STAGEDIR}${DATADIR}
 	@${REINPLACE_CMD} -i '' -e "s|%%PKGVERSION%%|${PKGVERSION}|" \
 		${STAGEDIR}${DATADIR}/info.xml
+
+post-install:
+	@${FIND} -s ${STAGEDIR}${PREFIX} -type f -print | \
+		${SED} -e "s#${STAGEDIR}${PREFIX}/##g" >> ${TMPPLIST}
+	@${FIND} -s ${STAGEDIR}/etc -type f -print | \
+		${SED} -e "s#${STAGEDIR}##g" >> ${TMPPLIST}
 
 do-test:
 	cd ${WRKSRC:H} && \
