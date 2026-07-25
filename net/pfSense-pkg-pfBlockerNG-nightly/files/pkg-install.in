@@ -1,7 +1,81 @@
 #!/bin/sh
 
-if [ "${2}" != "POST-INSTALL" ]; then
-	exit 0
-fi
+set -eu
 
-${PKG_ROOTDIR}/usr/local/bin/php -f ${PKG_ROOTDIR}/etc/rc.packages %%PORTNAME%% ${2}
+phase=${2-}
+root=${PKG_ROOTDIR-}
+php="${root}/usr/local/bin/php"
+
+case "${phase}" in
+	PRE-INSTALL)
+		PKG_ROOTDIR="${root}" "${php}" -r '
+$root = (string) getenv("PKG_ROOTDIR");
+foreach (array("/etc/inc/config.inc", "/etc/inc/util.inc") as $path) {
+	$path = $root . $path;
+	if (is_file($path)) {
+		require_once $path;
+	}
+}
+if (!function_exists("config_get_path") || !function_exists("dump_xml_config")) {
+	throw new RuntimeException("pfBlockerNG: legacy settings fallback unavailable");
+}
+$marker = config_get_path("installedpackages/pfblockerng/config/0/settings_family", "");
+if ($marker === "") {
+	$source = "3.2";
+} elseif (in_array($marker, array("3.2", "4.0", "4.1"), true)) {
+	$source = $marker;
+} else {
+	throw new RuntimeException("pfBlockerNG: invalid settings family marker");
+}
+$installed = config_get_path("installedpackages", array());
+$owned = array();
+foreach (is_array($installed) ? $installed : array() as $name => $value) {
+	if (is_string($name) && strpos($name, "pfblockerng") === 0) {
+		$owned[$name] = $value;
+	}
+}
+if ($owned === array()) {
+	exit(0);
+}
+$xml = dump_xml_config(
+	array("family" => $source, "payload" => base64_encode(serialize($owned))),
+	"pfblockerng-settings"
+);
+if (!is_string($xml) || $xml === "") {
+	throw new RuntimeException("pfBlockerNG: unable to encode settings");
+}
+$slot = $root . "/var/db/pfblockerng/settings-" . $source . ".xml";
+$directory = dirname($slot);
+if (is_link($directory)) {
+	throw new RuntimeException("pfBlockerNG: unsafe settings directory");
+}
+if (!is_dir($directory)) {
+	if (!mkdir($directory, 0755, true) || !chmod($directory, 0755)) {
+		throw new RuntimeException("pfBlockerNG: unable to create settings directory");
+	}
+}
+$expected_uid = $root === "" ? 0 : (function_exists("posix_geteuid") ? posix_geteuid() : getmyuid());
+$directory_stat = lstat($directory);
+if ($directory_stat === false || $directory_stat["uid"] !== $expected_uid
+	|| ($directory_stat["mode"] & 0022) !== 0) {
+	throw new RuntimeException("pfBlockerNG: unsafe settings directory owner");
+}
+$temporary = tempnam($directory, ".settings-");
+if ($temporary === false) {
+	throw new RuntimeException("pfBlockerNG: unable to create settings temporary file");
+}
+if (file_put_contents($temporary, $xml) !== strlen($xml)
+	|| !chmod($temporary, 0600) || !rename($temporary, $slot)
+	|| file_get_contents($slot) !== $xml) {
+	@unlink($temporary);
+	throw new RuntimeException("pfBlockerNG: unable to publish settings");
+}
+'
+		;;
+	POST-INSTALL)
+		"${php}" -f "${root}/etc/rc.packages" %%PORTNAME%% "${phase}"
+		;;
+	*)
+		exit 0
+		;;
+esac
