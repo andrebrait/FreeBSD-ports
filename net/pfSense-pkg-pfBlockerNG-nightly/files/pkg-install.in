@@ -1,7 +1,638 @@
 #!/bin/sh
 
-if [ "${2}" != "POST-INSTALL" ]; then
-	exit 0
+set -eu
+
+phase=${2-}
+case "$phase" in
+	PRE-INSTALL|POST-INSTALL)
+		;;
+	*)
+		exit 0
+		;;
+esac
+
+root=${PKG_ROOTDIR-}
+php="${root}/usr/local/bin/php"
+pkg="${root}/usr/local/sbin/pkg"
+state_root="${root}/cf/conf/pfblockerng"
+target_name=%%PORTNAME%%
+target=${1-}
+
+case "$target" in
+	"${target_name}-"*)
+		target_version=${target#"${target_name}-"}
+		;;
+	*)
+		echo "pfBlockerNG: invalid package identity" >&2
+		exit 1
+		;;
+esac
+
+transition_php()
+{
+	"$php" <<'PHP'
+<?php
+
+$step = getenv('PFB_TRANSITION_STEP');
+$prefix = getenv('PFB_TRANSITION_PREFIX');
+$root = getenv('PFB_TRANSITION_ROOT');
+$targetName = getenv('PFB_TRANSITION_TARGET_NAME');
+$targetVersion = getenv('PFB_TRANSITION_TARGET_VERSION');
+
+foreach ([$prefix . '/etc/inc/config.inc', $prefix . '/etc/inc/util.inc'] as $include) {
+	if (is_file($include)) {
+		require_once $include;
+	}
+}
+$packageInclude = $prefix . '/usr/local/pkg/pfblockerng/pfblockerng.inc';
+if (is_file($packageInclude)) {
+	require_once $packageInclude;
+}
+
+if ($step === 'migrate') {
+	if (!file_exists($root . '/transition-journal.json')) {
+		exit(0);
+	}
+	if (!function_exists('pfb_settings_transition_apply')) {
+		throw new RuntimeException('settings transition apply function unavailable');
+	}
+	pfb_settings_transition_apply('4.0', $targetName, $targetVersion, $root);
+	exit(0);
+}
+
+if ($step === 'complete') {
+	if (!function_exists('pfb_settings_transition_complete')) {
+		throw new RuntimeException('settings transition completion function unavailable');
+	}
+	pfb_settings_transition_complete('4.0', $targetName, $targetVersion, $root);
+	exit(0);
+}
+
+if ($step !== 'prepare') {
+	throw new InvalidArgumentException('invalid settings transition lifecycle step');
+}
+
+$sourceName = getenv('PFB_TRANSITION_SOURCE_NAME');
+$sourceVersion = getenv('PFB_TRANSITION_SOURCE_VERSION');
+$artifact = getenv('PFB_TRANSITION_ARTIFACT');
+$artifactSha256 = getenv('PFB_TRANSITION_ARTIFACT_SHA256');
+$targetAbi = getenv('PFB_TRANSITION_TARGET_ABI');
+$targetSource = getenv('PFB_TRANSITION_TARGET_SOURCE');
+
+if (function_exists('pfb_settings_transition_prepare')) {
+	pfb_settings_transition_prepare(
+		$sourceName,
+		$sourceVersion,
+		'4.0',
+		$targetName,
+		$targetVersion,
+		$artifact,
+		$artifactSha256,
+		$targetAbi,
+		$targetSource,
+		'',
+		$root
+	);
+	exit(0);
+}
+
+if (!function_exists('config_get_path') || !function_exists('write_config')
+	|| !function_exists('config_read_file') || !function_exists('lock')
+	|| !function_exists('unlock') || !function_exists('dump_xml_config')
+	|| !function_exists('parse_xml_config')) {
+	throw new RuntimeException('legacy settings transition prerequisites unavailable');
+}
+
+$installed = config_get_path('installedpackages', []);
+if (!is_array($installed)) {
+	throw new RuntimeException('invalid installedpackages structure');
+}
+$owned = [];
+foreach ($installed as $key => $value) {
+	if (is_string($key) && str_starts_with($key, 'pfblockerng')) {
+		$owned[$key] = $value;
+	}
+}
+$marker = config_get_path('installedpackages/pfblockerng/config/0/pfb_schema_family', '');
+if ($marker === '4.0') {
+	throw new RuntimeException('v4 settings transition function unavailable');
+}
+if ($owned === [] && $marker === '') {
+	exit(0);
+}
+if ($marker !== '' && $marker !== '3.2') {
+	throw new RuntimeException('unsupported settings schema family');
+}
+if ($sourceName === '' || $sourceVersion === '') {
+	throw new RuntimeException('installed source package identity unavailable');
+}
+if (getenv('PFB_BYPASS_UPGRADE_VERSION_CHECKS') !== '1') {
+	fwrite(
+		STDERR,
+		"pfBlockerNG: legacy settings need explicit authorization; retry exactly:\n"
+		. "PFB_BYPASS_UPGRADE_VERSION_CHECKS=1 pkg install -y -f {$targetName}-{$targetVersion}\n"
+	);
+	exit(1);
+}
+
+$syncDirectory = static function (string $directory): void {
+	$handle = @fopen($directory, 'r');
+	if ($handle === false) {
+		throw new RuntimeException('unable to open settings directory');
+	}
+	try {
+		if (!fflush($handle) || (function_exists('fsync') && !fsync($handle))) {
+			throw new RuntimeException('unable to sync settings directory');
+		}
+	} finally {
+		fclose($handle);
+	}
+};
+$validateDirectory = static function (string $directory): void {
+	$stat = @lstat($directory);
+	$uid = function_exists('posix_geteuid') ? posix_geteuid() : 0;
+	if ($stat === false || !is_dir($directory) || is_link($directory)
+		|| ($stat['mode'] & 0777) !== 0700
+		|| ($stat['uid'] !== 0 && $stat['uid'] !== $uid)) {
+		throw new RuntimeException('unsafe settings transition directory');
+	}
+};
+$validateFile = static function (string $path): void {
+	$stat = @lstat($path);
+	$uid = function_exists('posix_geteuid') ? posix_geteuid() : 0;
+	if ($stat === false || !is_file($path) || is_link($path) || $stat['nlink'] !== 1
+		|| ($stat['mode'] & 0777) !== 0600
+		|| ($stat['uid'] !== 0 && $stat['uid'] !== $uid)) {
+		throw new RuntimeException('unsafe settings transition artifact');
+	}
+};
+$ensureDirectory = static function (string $directory) use ($validateDirectory): void {
+	if (!file_exists($directory) && !mkdir($directory, 0700)) {
+		throw new RuntimeException('unable to create settings transition directory');
+	}
+	$validateDirectory($directory);
+};
+$atomicWrite = static function (string $path, string $bytes) use ($syncDirectory): void {
+	$directory = dirname($path);
+	$temp = $directory . '/.' . basename($path) . '.' . bin2hex(random_bytes(8)) . '.tmp';
+	$handle = @fopen($temp, 'x+b');
+	if ($handle === false) {
+		throw new RuntimeException('unable to stage settings transition artifact');
+	}
+	try {
+		$offset = 0;
+		while ($offset < strlen($bytes)) {
+			$written = fwrite($handle, substr($bytes, $offset));
+			if ($written === false || $written === 0) {
+				throw new RuntimeException('unable to write settings transition artifact');
+			}
+			$offset += $written;
+		}
+		if (!fflush($handle) || (function_exists('fsync') && !fsync($handle))
+			|| !chmod($temp, 0600)) {
+			throw new RuntimeException('unable to sync settings transition artifact');
+		}
+	} finally {
+		fclose($handle);
+	}
+	$stat = @lstat($temp);
+	$uid = function_exists('posix_geteuid') ? posix_geteuid() : 0;
+	if ($stat === false || !is_file($temp) || is_link($temp) || $stat['nlink'] !== 1
+		|| ($stat['mode'] & 0777) !== 0600
+		|| ($stat['uid'] !== 0 && $stat['uid'] !== $uid)) {
+		@unlink($temp);
+		throw new RuntimeException('unsafe settings transition artifact');
+	}
+	if (file_get_contents($temp) !== $bytes) {
+		@unlink($temp);
+		throw new RuntimeException('settings transition artifact readback mismatch');
+	}
+	if (!rename($temp, $path)) {
+		@unlink($temp);
+		throw new RuntimeException('unable to publish settings transition artifact');
+	}
+	$syncDirectory($directory);
+	if (file_get_contents($path) !== $bytes) {
+		throw new RuntimeException('published settings transition artifact readback mismatch');
+	}
+};
+$parseSnapshot = static function (
+	string $path,
+	string $family,
+	string $scratch
+	) use ($validateFile): array {
+	$validateFile($path);
+	$bytes = @file_get_contents($path);
+	$xml = is_string($bytes) ? @gzdecode($bytes) : false;
+	if (!is_string($xml) || $xml === ''
+		|| preg_match('/<!DOCTYPE|<!ENTITY|XInclude|<\?(?!xml\b)/i', $xml) === 1) {
+		throw new RuntimeException('invalid settings snapshot');
+	}
+	$temp = $scratch . '/.parse.' . bin2hex(random_bytes(8)) . '.tmp';
+	$handle = @fopen($temp, 'x+b');
+	if ($handle === false || fwrite($handle, $xml) !== strlen($xml)
+		|| !fflush($handle) || !chmod($temp, 0600)) {
+		if (is_resource($handle)) {
+			fclose($handle);
+		}
+		@unlink($temp);
+		throw new RuntimeException('unable to stage settings snapshot readback');
+	}
+	fclose($handle);
+	try {
+		$document = parse_xml_config($temp, 'pfblockerng-settings');
+	} finally {
+		@unlink($temp);
+	}
+	$keys = [
+		'format_version', 'family', 'source_package_name', 'source_package_version',
+		'created_utc', 'payload_sha256', 'owned',
+	];
+	if (!is_array($document) || array_keys($document) !== $keys
+		|| $document['format_version'] !== '1' || $document['family'] !== $family
+		|| !is_array($document['owned'])
+		|| !hash_equals($document['payload_sha256'], hash('sha256', serialize($document['owned'])))) {
+		throw new RuntimeException('settings snapshot readback mismatch');
+	}
+	return $document;
+};
+$readJson = static function (string $path) use ($validateFile): array {
+	$validateFile($path);
+	$bytes = file_get_contents($path);
+	$value = is_string($bytes) ? json_decode($bytes, true, 512, JSON_THROW_ON_ERROR) : null;
+	if (!is_array($value)
+		|| json_encode($value, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES) !== $bytes) {
+		throw new RuntimeException('non-canonical settings transition metadata');
+	}
+	return $value;
+};
+$writeJson = static function (string $path, array $value) use ($atomicWrite, $readJson): void {
+	$atomicWrite($path, json_encode($value, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+	if ($readJson($path) !== $value) {
+		throw new RuntimeException('published settings transition metadata mismatch');
+	}
+};
+
+$lockKey = lock('pfblockerng-settings-transition', LOCK_EX);
+if ($lockKey === false) {
+	throw new RuntimeException('settings transition lock unavailable');
+}
+try {
+	$ensureDirectory($root);
+	$familyDirectory = $root . '/3.2';
+	$ensureDirectory($familyDirectory);
+	$journalPath = $root . '/transition-journal.json';
+	$targetSnapshotSha256 = '';
+	$statePath = $root . '/transition-state.json';
+	$state = [
+		'state_version' => 1,
+		'activations' => ['3.2' => '', '4.0' => ''],
+		'divergences' => [],
+	];
+	if (file_exists($statePath) || is_link($statePath)) {
+		$state = $readJson($statePath);
+		if (array_keys($state) !== ['state_version', 'activations', 'divergences']
+			|| $state['state_version'] !== 1 || !is_array($state['activations'])
+			|| array_keys($state['activations']) !== ['3.2', '4.0']
+			|| !is_string($state['activations']['3.2'])
+			|| ($state['activations']['3.2'] !== ''
+				&& !preg_match('/^[a-f0-9]{64}$/D', $state['activations']['3.2']))
+			|| !is_string($state['activations']['4.0'])
+			|| ($state['activations']['4.0'] !== ''
+				&& !preg_match('/^[a-f0-9]{64}$/D', $state['activations']['4.0']))
+			|| !is_array($state['divergences']) || !array_is_list($state['divergences'])) {
+			throw new RuntimeException('invalid settings transition state');
+		}
+		foreach ($state['divergences'] as $divergence) {
+			if (!is_array($divergence) || array_keys($divergence) !== [
+				'source_family', 'target_family', 'source_snapshot_sha256',
+				'target_snapshot_sha256', 'acknowledged',
+			] || !in_array($divergence['source_family'], ['3.2', '4.0'], true)
+				|| !in_array($divergence['target_family'], ['3.2', '4.0'], true)
+				|| $divergence['source_family'] === $divergence['target_family']
+				|| !preg_match('/^[a-f0-9]{64}$/D', $divergence['source_snapshot_sha256'])
+				|| !preg_match('/^[a-f0-9]{64}$/D', $divergence['target_snapshot_sha256'])
+				|| !is_bool($divergence['acknowledged'])) {
+				throw new RuntimeException('invalid settings transition divergence');
+			}
+		}
+		$targetSnapshotSha256 = $state['activations']['4.0'];
+	}
+	if ($targetSnapshotSha256 !== '') {
+		$targetDirectory = $root . '/4.0';
+		$validateDirectory($targetDirectory);
+		$targetHeadPath = $targetDirectory . '/head.json';
+		$targetHead = $readJson($targetHeadPath);
+		if (array_keys($targetHead) !== ['family', 'snapshot', 'payload_sha256']
+			|| $targetHead['family'] !== '4.0'
+			|| $targetHead['snapshot'] !== $targetSnapshotSha256 . '.xml.gz'
+			|| $targetHead['payload_sha256'] !== $targetSnapshotSha256) {
+			throw new RuntimeException('invalid v4 settings snapshot head');
+		}
+		$parseSnapshot($targetDirectory . '/' . $targetHead['snapshot'], '4.0', $targetDirectory);
+	}
+	$action = $targetSnapshotSha256 === '' ? 'migrate' : 'restore';
+
+	if (file_exists($journalPath) || is_link($journalPath)) {
+		$journal = $readJson($journalPath);
+		$journalKeys = [
+			'journal_version', 'phase', 'action', 'source_family', 'source_package_name',
+			'source_package_version', 'source_snapshot_sha256', 'source_live_sha256',
+			'target_family', 'target_package_name', 'target_package_version',
+			'target_snapshot_sha256', 'target_artifact', 'target_artifact_sha256',
+			'target_abi', 'target_source_identity', 'authorization_sha256',
+		];
+		if (array_keys($journal) !== $journalKeys
+			|| $journal['journal_version'] !== 1 || $journal['phase'] !== 'prepared'
+			|| $journal['action'] !== $action || $journal['source_family'] !== '3.2'
+			|| $journal['source_package_name'] !== $sourceName
+			|| $journal['source_package_version'] !== $sourceVersion
+			|| !preg_match('/^[a-f0-9]{64}$/D', $journal['source_snapshot_sha256'])
+			|| !preg_match('/^[a-f0-9]{64}$/D', $journal['source_live_sha256'])
+			|| $journal['target_snapshot_sha256'] !== $targetSnapshotSha256
+			|| $journal['authorization_sha256'] !== '') {
+			throw new RuntimeException('invalid settings transition journal');
+		}
+		$expected = [
+			'target_family' => '4.0',
+			'target_package_name' => $targetName,
+			'target_package_version' => $targetVersion,
+			'target_artifact' => $artifact,
+			'target_artifact_sha256' => $artifactSha256,
+			'target_abi' => $targetAbi,
+			'target_source_identity' => $targetSource,
+		];
+		foreach ($expected as $field => $value) {
+			if (($journal[$field] ?? null) !== $value) {
+				throw new RuntimeException('settings transition journal identity mismatch');
+			}
+		}
+		$snapshotPath = $familyDirectory . '/' . $journal['source_snapshot_sha256'] . '.xml.gz';
+		$document = $parseSnapshot($snapshotPath, '3.2', $familyDirectory);
+		$owned = $document['owned'];
+		if ($state['activations']['3.2'] === '') {
+			$state['activations']['3.2'] = $journal['source_snapshot_sha256'];
+			$writeJson($statePath, $state);
+		}
+	} else {
+		$sourceSnapshotSha256 = hash('sha256', serialize($owned));
+		$snapshotPath = $familyDirectory . '/' . $sourceSnapshotSha256 . '.xml.gz';
+		if (file_exists($snapshotPath)) {
+			$document = $parseSnapshot($snapshotPath, '3.2', $familyDirectory);
+			if ($document['owned'] !== $owned) {
+				throw new RuntimeException('settings snapshot payload mismatch');
+			}
+		} else {
+			$document = [
+				'format_version' => '1',
+				'family' => '3.2',
+				'source_package_name' => $sourceName,
+				'source_package_version' => $sourceVersion,
+				'created_utc' => gmdate('Y-m-d\TH:i:s\Z'),
+				'payload_sha256' => $sourceSnapshotSha256,
+				'owned' => $owned,
+			];
+			$xml = dump_xml_config($document, 'pfblockerng-settings');
+			$compressed = gzencode($xml, 9);
+			if ($compressed === false) {
+				throw new RuntimeException('unable to compress settings snapshot');
+			}
+			$atomicWrite($snapshotPath, $compressed);
+			if ($parseSnapshot($snapshotPath, '3.2', $familyDirectory) !== $document) {
+				throw new RuntimeException('settings snapshot structural mismatch');
+			}
+		}
+		$head = [
+			'family' => '3.2',
+			'snapshot' => basename($snapshotPath),
+			'payload_sha256' => $sourceSnapshotSha256,
+		];
+		$writeJson($familyDirectory . '/head.json', $head);
+		$stateChanged = false;
+		if ($state['activations']['3.2'] === '') {
+			$state['activations']['3.2'] = $sourceSnapshotSha256;
+			$stateChanged = true;
+		} elseif ($action === 'restore' && $state['activations']['3.2'] !== $sourceSnapshotSha256) {
+			$seen = false;
+			foreach ($state['divergences'] as $divergence) {
+				if ($divergence['source_snapshot_sha256'] === $sourceSnapshotSha256
+					&& $divergence['target_snapshot_sha256'] === $targetSnapshotSha256) {
+					$seen = true;
+				}
+			}
+			if (!$seen) {
+				$state['divergences'][] = [
+					'source_family' => '3.2',
+					'target_family' => '4.0',
+					'source_snapshot_sha256' => $sourceSnapshotSha256,
+					'target_snapshot_sha256' => $targetSnapshotSha256,
+					'acknowledged' => false,
+				];
+				$stateChanged = true;
+			}
+		}
+		if ($stateChanged) {
+			$writeJson($statePath, $state);
+		}
+
+		$projected = $owned;
+		if (!isset($projected['pfblockerng']) || !is_array($projected['pfblockerng'])) {
+			$projected['pfblockerng'] = [];
+		}
+		if (!isset($projected['pfblockerng']['config'][0])
+			|| !is_array($projected['pfblockerng']['config'][0])) {
+			$projected['pfblockerng']['config'][0] = [];
+		}
+		$projected['pfblockerng']['config'][0]['pfb_schema_family'] = '3.2';
+		$projected['pfblockerng']['config'][0]['pfb_keep'] = 'on';
+		$sourceLiveSha256 = hash('sha256', serialize($projected));
+		$journal = [
+			'journal_version' => 1,
+			'phase' => 'prepared',
+			'action' => $action,
+			'source_family' => '3.2',
+			'source_package_name' => $sourceName,
+			'source_package_version' => $sourceVersion,
+			'source_snapshot_sha256' => $sourceSnapshotSha256,
+			'source_live_sha256' => $sourceLiveSha256,
+			'target_family' => '4.0',
+			'target_package_name' => $targetName,
+			'target_package_version' => $targetVersion,
+			'target_snapshot_sha256' => $targetSnapshotSha256,
+			'target_artifact' => $artifact,
+			'target_artifact_sha256' => $artifactSha256,
+			'target_abi' => $targetAbi,
+			'target_source_identity' => $targetSource,
+			'authorization_sha256' => '',
+		];
+		$writeJson($journalPath, $journal);
+	}
+
+	$general = config_get_path('installedpackages/pfblockerng/config/0', []);
+	if (!is_array($general)) {
+		$general = [];
+	}
+	$general['pfb_schema_family'] = '3.2';
+	$general['pfb_keep'] = 'on';
+	config_set_path('installedpackages/pfblockerng/config/0', $general);
+	if (write_config('pfBlockerNG: prepare settings transition') === false) {
+		throw new RuntimeException('unable to persist settings transition marker');
+	}
+	config_read_file(false, true);
+	if (config_get_path('installedpackages/pfblockerng/config/0/pfb_schema_family', '') !== '3.2'
+		|| config_get_path('installedpackages/pfblockerng/config/0/pfb_keep', '') !== $general['pfb_keep']) {
+		throw new RuntimeException('settings transition marker readback mismatch');
+	}
+	$readbackInstalled = config_get_path('installedpackages', []);
+	$readbackOwned = [];
+	foreach (is_array($readbackInstalled) ? $readbackInstalled : [] as $key => $value) {
+		if (is_string($key) && str_starts_with($key, 'pfblockerng')) {
+			$readbackOwned[$key] = $value;
+		}
+	}
+	if (!hash_equals($journal['source_live_sha256'], hash('sha256', serialize($readbackOwned)))) {
+		throw new RuntimeException('settings transition protected-state readback mismatch');
+	}
+} finally {
+	unlock($lockKey);
+}
+PHP
+}
+
+if [ "$phase" = "PRE-INSTALL" ]; then
+	cache="${root}/var/cache/pkg"
+	count=0
+	artifact=
+	# pkg cache uses lstat-safe internal names: name-version~checksum.pkg.
+	for candidate in "$cache/${target}"~*.pkg "$cache/${target}"~*.txz; do
+		if [ -f "$candidate" ] || [ -L "$candidate" ]; then
+			count=$((count + 1))
+			artifact=$candidate
+		fi
+	done
+	if [ "$count" -ne 1 ]; then
+		echo "pfBlockerNG: expected exactly one cached target artifact" >&2
+		exit 1
+	fi
+
+	stat_record=$(stat -f '%HT|%l|%Lp|%u' "$artifact") || exit 1
+	IFS='|' read -r artifact_type artifact_links mode owner <<EOF
+$stat_record
+EOF
+	mode_value=$((0${mode}))
+	if [ "$artifact_type" != "Regular File" ] || [ "$artifact_links" -ne 1 ] \
+		|| [ $((mode_value & 022)) -ne 0 ] \
+		|| { [ "$owner" -ne 0 ] && [ "$owner" -ne "$(id -u)" ]; }; then
+		echo "pfBlockerNG: unsafe cached target artifact" >&2
+		exit 1
+	fi
+
+	# Official metadata forms: pkg query -F; pkg rquery -r pfblockerng.
+	embedded_name=$("$pkg" query -F "$artifact" '%n')
+	embedded_version=$("$pkg" query -F "$artifact" '%v')
+	embedded_abi=$("$pkg" query -F "$artifact" '%q')
+	annotations=$("$pkg" query -F "$artifact" '%An=%Av')
+	current_abi=$("$pkg" config ABI)
+	catalog=$("$pkg" rquery -r pfblockerng '%n|%v|%q|%X' "$target")
+	[ "$(printf '%s\n' "$catalog" | sed '/^$/d' | wc -l | tr -d ' ')" -eq 1 ] || exit 1
+	commit=$(printf '%s\n' "$annotations" | sed -n 's/^commit=//p')
+	[ "$(printf '%s\n' "$commit" | sed '/^$/d' | wc -l | tr -d ' ')" -eq 1 ] || exit 1
+	case "$commit" in
+		*[!0-9A-Fa-f]*|'') exit 1 ;;
+	esac
+	[ "${#commit}" -eq 40 ] || exit 1
+
+	IFS='|' read -r catalog_name catalog_version catalog_abi catalog_checksum <<EOF
+$catalog
+EOF
+	[ -n "$catalog_checksum" ] || exit 1
+	catalog_hash=${catalog_checksum#sha256:}
+	artifact_hash=$(sha256 -q "$artifact")
+	[ "$embedded_name" = "$target_name" ] \
+		&& [ "$embedded_version" = "$target_version" ] \
+		&& [ "$embedded_abi" = "$current_abi" ] \
+		&& [ "$catalog_name" = "$target_name" ] \
+		&& [ "$catalog_version" = "$target_version" ] \
+		&& [ "$catalog_abi" = "$current_abi" ] \
+		&& [ "$catalog_hash" = "$artifact_hash" ] || {
+			echo "pfBlockerNG: target artifact identity mismatch" >&2
+			exit 1
+		}
+
+	source_rows=
+	while IFS='|' read -r candidate_name candidate_version candidate_extra; do
+		case "$candidate_name" in
+			pfSense-pkg-pfBlockerNG|pfSense-pkg-pfBlockerNG-devel|pfSense-pkg-pfBlockerNG-nightly)
+				;;
+			*)
+				continue
+				;;
+		esac
+		case "$candidate_version" in
+			3.2.*)
+				;;
+			*)
+				continue
+				;;
+		esac
+		[ -z "$candidate_extra" ] || continue
+		if [ -n "$source_rows" ]; then
+			source_rows="${source_rows}
+${candidate_name}|${candidate_version}"
+		else
+			source_rows="${candidate_name}|${candidate_version}"
+		fi
+	done <<EOF
+$("$pkg" query '%n|%v')
+EOF
+	source_count=$(printf '%s\n' "$source_rows" | sed '/^$/d' | wc -l | tr -d ' ')
+	[ "$source_count" -le 1 ] || {
+		echo "pfBlockerNG: installed source package identity unavailable" >&2
+		exit 1
+	}
+	if [ "$source_count" -eq 1 ]; then
+		IFS='|' read -r source_name source_version <<EOF
+$source_rows
+EOF
+		[ -n "$source_name" ] && [ -n "$source_version" ] || exit 1
+		source_reverse_rows=$("$pkg" query '%n|%v' "$source_name")
+		[ "$source_reverse_rows" = "${source_name}|${source_version}" ] || {
+			echo "pfBlockerNG: installed source package identity changed" >&2
+			exit 1
+		}
+	else
+		source_name=
+		source_version=
+	fi
+
+	PFB_TRANSITION_STEP=prepare \
+	PFB_TRANSITION_PREFIX="$root" \
+	PFB_TRANSITION_ROOT="$state_root" \
+	PFB_TRANSITION_SOURCE_NAME="$source_name" \
+	PFB_TRANSITION_SOURCE_VERSION="$source_version" \
+	PFB_TRANSITION_TARGET_NAME="$target_name" \
+	PFB_TRANSITION_TARGET_VERSION="$target_version" \
+	PFB_TRANSITION_ARTIFACT="$artifact" \
+	PFB_TRANSITION_ARTIFACT_SHA256="$artifact_hash" \
+	PFB_TRANSITION_TARGET_ABI="$current_abi" \
+	PFB_TRANSITION_TARGET_SOURCE="git:$commit" \
+	transition_php
+	exit $?
 fi
 
-${PKG_ROOTDIR}/usr/local/bin/php -f ${PKG_ROOTDIR}/etc/rc.packages %%PORTNAME%% ${2}
+PFB_TRANSITION_STEP=migrate \
+PFB_TRANSITION_PREFIX="$root" \
+PFB_TRANSITION_ROOT="$state_root" \
+PFB_TRANSITION_TARGET_NAME="$target_name" \
+PFB_TRANSITION_TARGET_VERSION="$target_version" \
+transition_php
+
+PFB_TRANSITION_STEP=rc \
+"$php" -f "${root}/etc/rc.packages" %%PORTNAME%% "$phase"
+
+PFB_TRANSITION_STEP=complete \
+PFB_TRANSITION_PREFIX="$root" \
+PFB_TRANSITION_ROOT="$state_root" \
+PFB_TRANSITION_TARGET_NAME="$target_name" \
+PFB_TRANSITION_TARGET_VERSION="$target_version" \
+transition_php
