@@ -15,7 +15,8 @@ RUN_DEPENDS=	${LOCALBASE}/bin/mmdblookup:net/libmaxminddb \
 		${LOCALBASE}/bin/rsync:net/rsync \
 		${LOCALBASE}/sbin/lighttpd:www/lighttpd \
 		${PYTHON_PKGNAMEPREFIX}sqlite3>0:databases/py-sqlite3@${PY_FLAVOR} \
-		${PYTHON_PKGNAMEPREFIX}maxminddb>0:net/py-maxminddb@${PY_FLAVOR}
+		${PYTHON_PKGNAMEPREFIX}maxminddb>0:net/py-maxminddb@${PY_FLAVOR} \
+		${PYTHON_PKGNAMEPREFIX}charset-normalizer>0:textproc/py-charset-normalizer@${PY_FLAVOR}
 
 USES=		php python
 
