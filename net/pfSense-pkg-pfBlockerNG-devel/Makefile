@@ -20,6 +20,8 @@ RUN_DEPENDS=	${LOCALBASE}/bin/mmdblookup:net/libmaxminddb \
 
 USES=		php python
 
+NO_ARCH=	yes
+
 CONFLICTS=	pfSense-pkg-pfBlockerNG
 
 USE_PHP=	intl
