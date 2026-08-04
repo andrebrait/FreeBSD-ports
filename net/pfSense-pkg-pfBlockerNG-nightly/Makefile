@@ -22,7 +22,7 @@ USES=		php python
 
 NO_ARCH=	yes
 
-CONFLICTS=	pfSense-pkg-pfBlockerNG pfSense-pkg-pfBlockerNG-devel
+CONFLICTS=	pfSense-pkg-pfBlockerNG pfSense-pkg-pfBlockerNG-testing pfSense-pkg-pfBlockerNG-edge pfSense-pkg-pfBlockerNG-devel
 
 USE_PHP=	intl
 NO_BUILD=	yes
