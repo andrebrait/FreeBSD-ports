@@ -1,6 +1,5 @@
-PORTNAME=	pfSense-pkg-pfBlockerNG
-PORTVERSION=	3.2.15
-PORTREVISION=	2
+PORTNAME=	pfSense-pkg-pfBlockerNG-testing
+PORTVERSION=	4.0.0.alpha.24
 CATEGORIES=	net
 
 MAINTAINER=	coreteam@pfsense.org
@@ -16,13 +15,14 @@ RUN_DEPENDS=	${LOCALBASE}/bin/mmdblookup:net/libmaxminddb \
 		${LOCALBASE}/bin/rsync:net/rsync \
 		${LOCALBASE}/sbin/lighttpd:www/lighttpd \
 		${PYTHON_PKGNAMEPREFIX}sqlite3>0:databases/py-sqlite3@${PY_FLAVOR} \
-		${PYTHON_PKGNAMEPREFIX}maxminddb>0:net/py-maxminddb@${PY_FLAVOR}
+		${PYTHON_PKGNAMEPREFIX}maxminddb>0:net/py-maxminddb@${PY_FLAVOR} \
+		${PYTHON_PKGNAMEPREFIX}charset-normalizer>0:textproc/py-charset-normalizer@${PY_FLAVOR}
 
 USES=		php python
 
 NO_ARCH=	yes
 
-CONFLICTS=	pfSense-pkg-pfBlockerNG-testing pfSense-pkg-pfBlockerNG-edge pfSense-pkg-pfBlockerNG-nightly pfSense-pkg-pfBlockerNG-devel
+CONFLICTS=	pfSense-pkg-pfBlockerNG pfSense-pkg-pfBlockerNG-edge pfSense-pkg-pfBlockerNG-nightly pfSense-pkg-pfBlockerNG-devel
 
 USE_PHP=	intl
 NO_BUILD=	yes
@@ -37,90 +37,69 @@ DIST_SUBDIR=	${PORTNAME}
 # GitHub extracts to <project>-<version>/; production files live under src/
 WRKSRC=		${WRKDIR}/${GH_PROJECT}-${PORTVERSION}/src
 
+TEST_DEPENDS=	${PYTHON_PKGNAMEPREFIX}pytest>=0:devel/py-pytest@${PY_FLAVOR}
+
 SUB_FILES=	pkg-install pkg-deinstall
 SUB_LIST=	PORTNAME=${PORTNAME}
+PLIST_DIRS=	/var/unbound /etc/inc/priv /etc/inc
 
 # The info.xml <name> is the pfSense package-REGISTRATION name, which rc.packages
 # (install_package_xml -> get_package_id) looks up by the pfSense-pkg- PREFIX-STRIPPED
-# name. So it MUST be the short name (pfBlockerNG), NOT the full ${PORTNAME}.
+# name. So it MUST be the short name (pfBlockerNG-testing), NOT the full ${PORTNAME}.
 post-extract:
 	@${SED} -i '' 's|%%PKGNAME%%|${PORTNAME:S/pfSense-pkg-//}|g' \
 		${WRKSRC}/usr/local/share/pfSense-pkg-pfBlockerNG/info.xml
+	@mv ${WRKSRC}/usr/local/share/pfSense-pkg-pfBlockerNG \
+		${WRKSRC}/usr/local/share/${PORTNAME}
 
 do-install:
+	(cd ${WRKSRC} && ${COPYTREE_SHARE} . ${STAGEDIR})
 	${MKDIR} ${STAGEDIR}/etc/inc/priv
+	${MKDIR} ${STAGEDIR}${PREFIX}/pkg/firewall_aliases_edit/pre_write_config
 	${MKDIR} ${STAGEDIR}${PREFIX}/pkg/pfblockerng
+	${MKDIR} ${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
 	${MKDIR} ${STAGEDIR}${PREFIX}/www/pfblockerng/www
 	${MKDIR} ${STAGEDIR}${PREFIX}/www/widgets/widgets
 	${MKDIR} ${STAGEDIR}${PREFIX}/www/widgets/include
 	${MKDIR} ${STAGEDIR}${PREFIX}/www/widgets/javascript
 	${MKDIR} ${STAGEDIR}${PREFIX}/www/wizards
+	${MKDIR} ${STAGEDIR}${PREFIX}/www/shortcuts
 	${MKDIR} ${STAGEDIR}/var/unbound
 	${MKDIR} ${STAGEDIR}${DATADIR}
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/*.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/*.py \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/list_scripts/*.sh \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng/list_scripts
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/pfb_unbound_include.inc \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/www/pfblockerng/www/*.php \
+		${STAGEDIR}${PREFIX}/www/pfblockerng/www
 	${INSTALL_DATA} -m 0644 ${WRKSRC}${PREFIX}/pkg/pfblockerng.xml \
 		${STAGEDIR}${PREFIX}/pkg
 	${INSTALL_DATA} ${WRKSRC}/etc/inc/priv/pfblockerng.priv.inc \
 		${STAGEDIR}/etc/inc/priv
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/pkg/pfblockerng/pfblockerng.inc \
 		${STAGEDIR}${PREFIX}/pkg/pfblockerng
+	${INSTALL_DATA} ${WRKSRC}${PREFIX}/pkg/pfblockerng/pfblockerng_apply.inc \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng
+	${INSTALL_DATA} ${WRKSRC}${PREFIX}/pkg/pfblockerng/pfblockerng_cron.inc \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng
+	${INSTALL_DATA} ${WRKSRC}${PREFIX}/pkg/pfblockerng/pfblockerng_geoip.inc \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/pkg/pfblockerng/pfblockerng_install.inc \
 		${STAGEDIR}${PREFIX}/pkg/pfblockerng
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/pkg/pfblockerng/pfblockerng_extra.inc \
 		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_AF.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_ALL_REGIONS.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_AP.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_AP_EAST.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_AP_NORTHEAST.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_AP_SOUTH.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_AP_SOUTHEAST.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_CA.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_CN.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_CN_NORTH.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_CN_NORTHWEST.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_EU.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_EU_CENTRAL.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_EU_NORTH.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_EU_SOUTH.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_EU_WEST.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_IL.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_ME.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_ME_CENTRAL.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_ME_SOUTH.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_SA.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_US.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_US_EAST.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_US_GOV.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_US_WEST.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
+	${INSTALL_DATA} ${WRKSRC}${PREFIX}/pkg/firewall_aliases_edit/pre_write_config/pfblockerng.php \
+		${STAGEDIR}${PREFIX}/pkg/firewall_aliases_edit/pre_write_config
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/www/pfblockerng/pfBlockerNG.js \
 		${STAGEDIR}${PREFIX}/www/pfblockerng
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/www/pfblockerng/pfblockerng_asn.txt \
 		${STAGEDIR}${PREFIX}/www/pfblockerng
+	${INSTALL_DATA} ${WRKSRC}${PREFIX}/www/shortcuts/pkg_pfblockerng.inc \
+		${STAGEDIR}${PREFIX}/www/shortcuts
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/www/pfblockerng/pfblockerng.php \
 		${STAGEDIR}${PREFIX}/www/pfblockerng
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/www/pfblockerng/pfblockerng_alerts.php \
@@ -139,6 +118,8 @@ do-install:
 		${STAGEDIR}${PREFIX}/www/pfblockerng
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/www/pfblockerng/pfblockerng_general.php \
 		${STAGEDIR}${PREFIX}/www/pfblockerng
+	${INSTALL_DATA} ${WRKSRC}${PREFIX}/www/pfblockerng/pfblockerng_hooks.php \
+		${STAGEDIR}${PREFIX}/www/pfblockerng
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/www/pfblockerng/pfblockerng_ip.php \
 		${STAGEDIR}${PREFIX}/www/pfblockerng
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/www/pfblockerng/pfblockerng_update.php \
@@ -146,6 +127,8 @@ do-install:
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/www/pfblockerng/pfblockerng_sync.php \
 		${STAGEDIR}${PREFIX}/www/pfblockerng
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/www/pfblockerng/pfblockerng_safesearch.php \
+		${STAGEDIR}${PREFIX}/www/pfblockerng
+	${INSTALL_DATA} ${WRKSRC}${PREFIX}/www/pfblockerng/pfblockerng_software.php \
 		${STAGEDIR}${PREFIX}/www/pfblockerng
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/www/pfblockerng/pfblockerng_threats.php \
 		${STAGEDIR}${PREFIX}/www/pfblockerng
@@ -175,21 +158,21 @@ do-install:
 		${STAGEDIR}${PREFIX}/pkg/pfblockerng
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/pkg/pfblockerng/pfb_dnsbl.youtube_restrictmoderate.conf \
 		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/pfblockerng.sh \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/pfb_unbound.py \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/pfb_unbound_include.inc \
-		${STAGEDIR}${PREFIX}/pkg/pfblockerng
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/pkg/pfblockerng/pfb_py_hsts.txt \
 		${STAGEDIR}${PREFIX}/pkg/pfblockerng
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/www/pfblockerng/www/index.php \
-		${STAGEDIR}${PREFIX}/www/pfblockerng/www
-	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/www/pfblockerng/www/dnsbl_default.php \
-		${STAGEDIR}${PREFIX}/www/pfblockerng/www
 	${INSTALL_DATA} ${WRKSRC}${DATADIR}/info.xml \
 		${STAGEDIR}${DATADIR}
 	@${REINPLACE_CMD} -i '' -e "s|%%PKGVERSION%%|${PKGVERSION}|" \
 		${STAGEDIR}${DATADIR}/info.xml
+
+post-install:
+	@${FIND} -s ${STAGEDIR}${PREFIX} -type f -print | \
+		${SED} -e "s#${STAGEDIR}${PREFIX}/##g" >> ${TMPPLIST}
+	@${FIND} -s ${STAGEDIR}/etc -type f -print | \
+		${SED} -e "s#${STAGEDIR}##g" >> ${TMPPLIST}
+
+do-test:
+	cd ${WRKSRC:H} && \
+		${SETENV} ${TEST_ENV} ${PYTHON_CMD} -m pytest -v
 
 .include <bsd.port.mk>

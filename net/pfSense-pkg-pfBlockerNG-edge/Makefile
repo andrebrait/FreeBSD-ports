@@ -1,4 +1,4 @@
-PORTNAME=	pfSense-pkg-pfBlockerNG-devel
+PORTNAME=	pfSense-pkg-pfBlockerNG-edge
 PORTVERSION=	4.0.0.alpha.24
 CATEGORIES=	net
 
@@ -22,7 +22,7 @@ USES=		php python
 
 NO_ARCH=	yes
 
-CONFLICTS=	pfSense-pkg-pfBlockerNG
+CONFLICTS=	pfSense-pkg-pfBlockerNG pfSense-pkg-pfBlockerNG-testing pfSense-pkg-pfBlockerNG-nightly pfSense-pkg-pfBlockerNG-devel
 
 USE_PHP=	intl
 NO_BUILD=	yes
@@ -45,7 +45,7 @@ PLIST_DIRS=	/var/unbound /etc/inc/priv /etc/inc
 
 # The info.xml <name> is the pfSense package-REGISTRATION name, which rc.packages
 # (install_package_xml -> get_package_id) looks up by the pfSense-pkg- PREFIX-STRIPPED
-# name. So it MUST be the short name (pfBlockerNG-devel), NOT the full ${PORTNAME}.
+# name. So it MUST be the short name (pfBlockerNG-edge), NOT the full ${PORTNAME}.
 post-extract:
 	@${SED} -i '' 's|%%PKGNAME%%|${PORTNAME:S/pfSense-pkg-//}|g' \
 		${WRKSRC}/usr/local/share/pfSense-pkg-pfBlockerNG/info.xml
