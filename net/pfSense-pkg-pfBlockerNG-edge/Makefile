@@ -1,5 +1,5 @@
 PORTNAME=	pfSense-pkg-pfBlockerNG-edge
-PORTVERSION=	4.0.0.alpha.24
+PORTVERSION=	4.0.0.a24
 CATEGORIES=	net
 
 MAINTAINER=	coreteam@pfsense.org
@@ -22,7 +22,7 @@ USES=		php python
 
 NO_ARCH=	yes
 
-CONFLICTS=	pfSense-pkg-pfBlockerNG pfSense-pkg-pfBlockerNG-testing pfSense-pkg-pfBlockerNG-nightly pfSense-pkg-pfBlockerNG-devel
+CONFLICTS=	pfSense-pkg-pfBlockerNG pfSense-pkg-pfBlockerNG-testing pfSense-pkg-pfBlockerNG-nightly
 
 USE_PHP=	intl
 NO_BUILD=	yes

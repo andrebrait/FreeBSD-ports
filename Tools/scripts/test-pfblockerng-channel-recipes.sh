@@ -107,12 +107,11 @@ check_recipe() {
 		no) assert_not_contains "$_makefile" 'charset-normalizer' "$_label charset-normalizer dependency" ;;
 	esac
 	case "$_label" in
-		stable) assert_contains "$_makefile" "PORTREVISION=${_tab}2" 'stable PORTREVISION' ;;
+		stable | testing) assert_contains "$_makefile" "PORTREVISION=${_tab}2" "$_label PORTREVISION" ;;
 		*) assert_not_contains "$_makefile" 'PORTREVISION=' "$_label static PORTREVISION" ;;
 	esac
 
-	_non_conflicts=$(printf '%s\n' "$_makefile" | awk '!/^CONFLICTS[[:space:]]*=/')
-	assert_not_contains "$_non_conflicts" 'pfSense-pkg-pfBlockerNG-devel' "$_label stale devel identity"
+	assert_not_contains "$_makefile" 'pfSense-pkg-pfBlockerNG-devel' "$_label stale devel identity"
 
 	for _hook in pkg-install.in pkg-deinstall.in; do
 		assert_file "$_dir/files/$_hook"
@@ -140,10 +139,8 @@ assert_eq "$(find "$PORTSDIR/net" -maxdepth 1 -type d -name 'pfSense-pkg-pfBlock
 ASSERTIONS=$((ASSERTIONS + 1))
 [ ! -d "$PORTSDIR/net/pfSense-pkg-pfBlockerNG-devel" ] || fail 'obsolete devel recipe directory exists'
 assert_file "$PORTSDIR/MOVED"
-_moved=$(cat "$PORTSDIR/MOVED")
-assert_contains "$_moved" \
-	'net/pfSense-pkg-pfBlockerNG-devel|net/pfSense-pkg-pfBlockerNG-testing|2026-08-04|Renamed to Testing channel' \
-	'Devel to Testing origin migration'
+assert_not_contains "$(cat "$PORTSDIR/MOVED")" 'net/pfSense-pkg-pfBlockerNG-devel' \
+	'obsolete Devel origin migration'
 
 _MAKE=''
 if command -v bmake >/dev/null 2>&1; then
@@ -153,17 +150,17 @@ elif [ "$(uname -s)" = FreeBSD ] && make -V .MAKE_VERSION >/dev/null 2>&1; then
 fi
 
 check_recipe net/pfSense-pkg-pfBlockerNG pfSense-pkg-pfBlockerNG \
-	'pfSense-pkg-pfBlockerNG-testing pfSense-pkg-pfBlockerNG-edge pfSense-pkg-pfBlockerNG-nightly pfSense-pkg-pfBlockerNG-devel' \
+	'pfSense-pkg-pfBlockerNG-testing pfSense-pkg-pfBlockerNG-edge pfSense-pkg-pfBlockerNG-nightly' \
 	3.2.15 pfSense-pkg-pfBlockerNG-3.2.15_2 no stable
 check_recipe net/pfSense-pkg-pfBlockerNG-testing pfSense-pkg-pfBlockerNG-testing \
-	'pfSense-pkg-pfBlockerNG pfSense-pkg-pfBlockerNG-edge pfSense-pkg-pfBlockerNG-nightly pfSense-pkg-pfBlockerNG-devel' \
-	4.0.0.alpha.24 pfSense-pkg-pfBlockerNG-testing-4.0.0.alpha.24 yes testing
+	'pfSense-pkg-pfBlockerNG pfSense-pkg-pfBlockerNG-edge pfSense-pkg-pfBlockerNG-nightly' \
+	3.2.15 pfSense-pkg-pfBlockerNG-testing-3.2.15_2 no testing
 check_recipe net/pfSense-pkg-pfBlockerNG-edge pfSense-pkg-pfBlockerNG-edge \
-	'pfSense-pkg-pfBlockerNG pfSense-pkg-pfBlockerNG-testing pfSense-pkg-pfBlockerNG-nightly pfSense-pkg-pfBlockerNG-devel' \
-	4.0.0.alpha.24 pfSense-pkg-pfBlockerNG-edge-4.0.0.alpha.24 yes edge
+	'pfSense-pkg-pfBlockerNG pfSense-pkg-pfBlockerNG-testing pfSense-pkg-pfBlockerNG-nightly' \
+	4.0.0.a24 pfSense-pkg-pfBlockerNG-edge-4.0.0.a24 yes edge
 check_recipe net/pfSense-pkg-pfBlockerNG-nightly pfSense-pkg-pfBlockerNG-nightly \
-	'pfSense-pkg-pfBlockerNG pfSense-pkg-pfBlockerNG-testing pfSense-pkg-pfBlockerNG-edge pfSense-pkg-pfBlockerNG-devel' \
-	4.0.0.alpha.24 pfSense-pkg-pfBlockerNG-nightly-4.0.0.alpha.24 yes nightly
+	'pfSense-pkg-pfBlockerNG pfSense-pkg-pfBlockerNG-testing pfSense-pkg-pfBlockerNG-edge' \
+	20260804 pfSense-pkg-pfBlockerNG-nightly-20260804 yes nightly
 
 if [ -z "$_MAKE" ]; then
 	printf 'info: bmake query unavailable; structural recipe checks only\n'
