@@ -8,6 +8,7 @@ pkg/pfblockerng/pfb_dnsbl.youtube_restrictmoderate.conf
 pkg/pfblockerng/pfblockerng.inc
 pkg/pfblockerng/pfblockerng.sh
 pkg/pfblockerng/pfblockerng_extra.inc
+pkg/pfblockerng/pfblockerng_software.inc
 pkg/pfblockerng/pfblockerng_install.inc
 pkg/pfblockerng/shallalist_global_usage
 pkg/pfblockerng/ut1_global_usage
@@ -56,6 +57,7 @@ www/pfblockerng/pfblockerng_safesearch.php
 www/pfblockerng/pfblockerng_sync.php
 www/pfblockerng/pfblockerng_threats.php
 www/pfblockerng/pfblockerng_update.php
+www/pfblockerng/pfblockerng_software.php
 www/pfblockerng/www/dnsbl_default.php
 www/pfblockerng/www/index.php
 www/widgets/include/widget-pfblockerng.inc

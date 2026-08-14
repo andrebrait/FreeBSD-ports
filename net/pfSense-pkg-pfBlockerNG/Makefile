@@ -1,6 +1,5 @@
 PORTNAME=	pfSense-pkg-pfBlockerNG
-PORTVERSION=	3.2.15
-PORTREVISION=	2
+PORTVERSION=	3.3.1
 CATEGORIES=	net
 
 MAINTAINER=	coreteam@pfsense.org
@@ -66,6 +65,8 @@ do-install:
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/pkg/pfblockerng/pfblockerng_install.inc \
 		${STAGEDIR}${PREFIX}/pkg/pfblockerng
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/pkg/pfblockerng/pfblockerng_extra.inc \
+		${STAGEDIR}${PREFIX}/pkg/pfblockerng
+	${INSTALL_DATA} ${WRKSRC}${PREFIX}/pkg/pfblockerng/pfblockerng_software.inc \
 		${STAGEDIR}${PREFIX}/pkg/pfblockerng
 	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/ip_pre_AWS_AF.sh \
 		${STAGEDIR}${PREFIX}/pkg/pfblockerng
@@ -142,6 +143,8 @@ do-install:
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/www/pfblockerng/pfblockerng_ip.php \
 		${STAGEDIR}${PREFIX}/www/pfblockerng
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/www/pfblockerng/pfblockerng_update.php \
+		${STAGEDIR}${PREFIX}/www/pfblockerng
+	${INSTALL_DATA} ${WRKSRC}${PREFIX}/www/pfblockerng/pfblockerng_software.php \
 		${STAGEDIR}${PREFIX}/www/pfblockerng
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/www/pfblockerng/pfblockerng_sync.php \
 		${STAGEDIR}${PREFIX}/www/pfblockerng
