@@ -144,7 +144,7 @@ do-install:
 		${STAGEDIR}${PREFIX}/www/wizards/pfblockerng_wizard.xml
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/www/wizards/pfblockerng_wizard.inc \
 		${STAGEDIR}${PREFIX}/www/wizards/pfblockerng_wizard.inc
-	${INSTALL_DATA} ${WRKSRC}${PREFIX}/pkg/pfblockerng/dnsbl_tld \
+	${INSTALL_DATA} ${WRKSRC}${PREFIX}/pkg/pfblockerng/dnsbl_* \
 		${STAGEDIR}${PREFIX}/pkg/pfblockerng
 	${INSTALL_DATA} ${WRKSRC}${PREFIX}/pkg/pfblockerng/shallalist_global_usage \
 		${STAGEDIR}${PREFIX}/pkg/pfblockerng
