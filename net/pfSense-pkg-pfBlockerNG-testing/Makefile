@@ -190,7 +190,7 @@ do-install:
 		${STAGEDIR}${PREFIX}/www/pfblockerng/www
 	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/www/pfblockerng/www/dnsbl_default.php \
 		${STAGEDIR}${PREFIX}/www/pfblockerng/www
-	${INSTALL_DATA} ${WRKSRC}${DATADIR}/info.xml \
+	${INSTALL_DATA} ${WRKSRC}${PREFIX}/share/pfSense-pkg-pfBlockerNG/info.xml \
 		${STAGEDIR}${DATADIR}
 	@${REINPLACE_CMD} -i '' -e "s|%%PKGVERSION%%|${PKGVERSION}|" \
 		${STAGEDIR}${DATADIR}/info.xml
