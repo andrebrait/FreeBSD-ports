@@ -66,6 +66,8 @@ do-install:
 	${MKDIR} ${STAGEDIR}${PREFIX}/www/shortcuts
 	${MKDIR} ${STAGEDIR}/var/unbound
 	${MKDIR} ${STAGEDIR}${DATADIR}
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/etc/rc.d/pfblockerng_repo_generate.sh \
+		${STAGEDIR}${PREFIX}/etc/rc.d
 	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/*.sh \
 		${STAGEDIR}${PREFIX}/pkg/pfblockerng
 	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/pkg/pfblockerng/*.py \
