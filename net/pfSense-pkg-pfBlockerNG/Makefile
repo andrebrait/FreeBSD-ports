@@ -56,6 +56,9 @@ do-install:
 	${MKDIR} ${STAGEDIR}${PREFIX}/www/wizards
 	${MKDIR} ${STAGEDIR}/var/unbound
 	${MKDIR} ${STAGEDIR}${DATADIR}
+	${MKDIR} ${STAGEDIR}${PREFIX}/etc/rc.d
+	${INSTALL_SCRIPT} ${WRKSRC}${PREFIX}/etc/rc.d/pfblockerng_repo_generate.sh \
+		${STAGEDIR}${PREFIX}/etc/rc.d
 	${INSTALL_DATA} -m 0644 ${WRKSRC}${PREFIX}/pkg/pfblockerng.xml \
 		${STAGEDIR}${PREFIX}/pkg
 	${INSTALL_DATA} ${WRKSRC}/etc/inc/priv/pfblockerng.priv.inc \

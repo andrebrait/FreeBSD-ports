@@ -1,4 +1,5 @@
 /etc/inc/priv/pfblockerng.priv.inc
+etc/rc.d/pfblockerng_repo_generate.sh
 pkg/pfblockerng.xml
 pkg/pfblockerng/dnsbl_tld
 pkg/pfblockerng/pfb_dnsbl.doh.conf
